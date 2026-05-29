@@ -1,7 +1,7 @@
 # 🎵 Songloft 快速使用指南
 
 <p align="center">
-  <img src="docs/public/social-preview.png" alt="Songloft" width="640">
+  <img src="https://raw.githubusercontent.com/songloft-org/songloft/main/docs/public/social-preview.png" alt="Songloft" width="640">
 </p>
 
 [![GitHub License](https://img.shields.io/github/license/songloft-org/songloft)](https://github.com/songloft-org/songloft)

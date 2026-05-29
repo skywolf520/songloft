@@ -11,7 +11,7 @@
   <strong>🎵 面向个人用户的自托管音乐服务器 — 仅管理你合法拥有的音乐</strong>
 </p>
 
-> 📣 **关于改名**：本项目自 v2.0 起由 **MiMusic** 更名为 **Songloft**（内核与功能不变，仅品牌升级）。老的 `mimusic-org` GitHub 组织与 `hanxi/mimusic` Docker 镜像保留至少一年作跳转，但不再更新。从老版本升级请参考 [迁移指南](./MIGRATION.md)。
+> 📣 **关于改名**：本项目自 v2.0 起由 **MiMusic** 更名为 **Songloft**（内核与功能不变，仅品牌升级）。老的 `mimusic-org` GitHub 组织与 `hanxi/mimusic` Docker 镜像保留至少一年作跳转，但不再更新。详见 [GitHub Releases](https://github.com/songloft-org/songloft/releases)。
 
 <p align="center">
   <a href="https://github.com/songloft-org/songloft">🏠 GitHub</a> •

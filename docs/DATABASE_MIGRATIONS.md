@@ -214,10 +214,10 @@ go install github.com/pressly/goose/v3/cmd/goose@latest
 
 # 回滚一版
 cd internal/database/migrations
-goose sqlite3 ../../../data/mimusic.db down
+goose sqlite3 ../../../data/songloft.db down
 ```
 
-线上不要回滚。项目规约是"加字段往前走、不删字段",真要重置 `rm -f data/mimusic.db` 重新跑迁移更省事。
+线上不要回滚。项目规约是"加字段往前走、不删字段",真要重置 `rm -f data/songloft.db` 重新跑迁移更省事。
 
 ## 文件清单速查
 

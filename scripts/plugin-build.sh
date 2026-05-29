@@ -21,14 +21,14 @@ build_plugin() {
 
 if [ $# -eq 0 ]; then
     # 无参数：构建所有插件
-    for plugin_dir in "$PLUGINS_DIR"/mimusic-jsplugin-*/; do
+    for plugin_dir in "$PLUGINS_DIR"/songloft-plugin-*/; do
         [ -d "$plugin_dir" ] || continue
         build_plugin "$plugin_dir"
     done
 else
     # 有参数：按名字构建指定插件
     for name in "$@"; do
-        plugin_dir="$PLUGINS_DIR/mimusic-jsplugin-$name"
+        plugin_dir="$PLUGINS_DIR/songloft-plugin-$name"
         if [ ! -d "$plugin_dir" ]; then
             echo "Error: plugin '$name' not found at $plugin_dir" >&2
             exit 1

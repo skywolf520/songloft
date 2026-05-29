@@ -19,11 +19,11 @@ const __dirname = dirname(__filename);
 const repoRoot = resolve(__dirname, '..');
 const issuesDir = resolve(repoRoot, 'docs/issues');
 
-const REPO = 'mimusic-org/mimusic';
+const REPO = 'songloft-org/songloft';
 const GITHUB_PROXY = 'https://gproxy.hanxi.cc/proxy';
 const REPLACE_RULES = [
   {
-    baseUrl: 'https://github.com/mimusic-org/mimusic/issues',
+    baseUrl: 'https://github.com/songloft-org/songloft/issues',
     targetUrl: '/issues',
   },
 ];

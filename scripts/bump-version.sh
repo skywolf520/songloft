@@ -185,7 +185,7 @@ main() {
     # CI 环境：自动配置 git user
     if [ -z "$(git config user.email 2>/dev/null)" ]; then
         log_warn "git user.email 未设置，自动配置为 CI 用户"
-        run_cmd "git config user.email 'ci@mimusic'"
+        run_cmd "git config user.email 'ci@songloft'"
         run_cmd "git config user.name 'Songloft CI'"
     fi
 

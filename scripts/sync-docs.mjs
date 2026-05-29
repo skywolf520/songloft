@@ -14,7 +14,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 const repoRoot = resolve(__dirname, '..');
 
-const REPO_BLOB_BASE = 'https://github.com/mimusic-org/mimusic/blob/main';
+const REPO_BLOB_BASE = 'https://github.com/songloft-org/songloft/blob/main';
 
 const syncItems = [
   { from: 'README.md',    to: 'docs/quick-start.md' },

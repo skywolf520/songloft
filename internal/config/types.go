@@ -6,5 +6,6 @@ type AppConfig struct {
 	DBPath                  string
 	Username                string
 	Password                string
+	BasePath                string
 	UsingDefaultCredentials bool
 }

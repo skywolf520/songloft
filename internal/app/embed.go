@@ -1,6 +1,7 @@
 package app
 
 import (
+	"bytes"
 	"io/fs"
 	"log/slog"
 	"mime"
@@ -28,8 +29,19 @@ func (a *App) registerWebStatic() {
 	// 轻量构建：embed 里没有 index.html，根路径返回提示页，其它路径交给 chi 默认 404
 	if _, err := fs.Stat(distFS, "index.html"); err != nil {
 		slog.Info("registerWebStatic: 未嵌入前端资源，以纯 API 模式运行")
-		a.router.Get("/", serveLitePage)
+		a.router.Get("/", a.serveLitePage)
 		return
+	}
+
+	// 读取 index.html 并在需要时注入 base path
+	indexBytes, _ := fs.ReadFile(distFS, "index.html")
+	if a.config.BasePath != "" {
+		indexBytes = bytes.Replace(
+			indexBytes,
+			[]byte(`<base href="/">`),
+			[]byte(`<base href="`+a.config.BasePath+`/">`),
+			1,
+		)
 	}
 
 	fileServer := http.FileServer(http.FS(distFS))
@@ -44,8 +56,18 @@ func (a *App) registerWebStatic() {
 					http.NotFound(w, r)
 					return
 				}
-				r.URL.Path = "/"
+				// SPA 回退：返回已注入 base path 的 index.html
+				w.Header().Set("Content-Type", "text/html; charset=utf-8")
+				w.Header().Set("Cache-Control", "no-cache")
+				w.Write(indexBytes)
+				return
 			}
+		} else {
+			// 根路径直接返回 index.html
+			w.Header().Set("Content-Type", "text/html; charset=utf-8")
+			w.Header().Set("Cache-Control", "no-cache")
+			w.Write(indexBytes)
+			return
 		}
 		fileServer.ServeHTTP(w, r)
 	}))
@@ -80,13 +102,14 @@ const litePageHTML = `<!DOCTYPE html>
     <a href="https://github.com/songloft-org/songloft" target="_blank" rel="noopener">项目主页</a>
   </div>
   <script>
-    document.getElementById('server-addr').textContent = window.location.origin;
+    document.getElementById('server-addr').textContent = window.location.origin + '%s';
   </script>
 </body>
 </html>`
 
-func serveLitePage(w http.ResponseWriter, r *http.Request) {
+func (a *App) serveLitePage(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	w.Header().Set("Cache-Control", "no-store")
-	_, _ = w.Write([]byte(litePageHTML))
+	html := strings.Replace(litePageHTML, "%s", a.config.BasePath, 1)
+	_, _ = w.Write([]byte(html))
 }

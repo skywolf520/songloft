@@ -11,6 +11,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"strconv"
+	"strings"
 	"time"
 
 	"songloft/internal/config"
@@ -255,7 +256,7 @@ func (a *App) Init() error {
 		return fmt.Errorf("创建 JS 插件数据目录失败: %w", err)
 	}
 	jsPluginRepo := a.db.JSPluginRepository()
-	a.jsPluginManager = jsplugin.NewManager(jsPluginRepo, jsPluginsDir, jsPluginsDataDir, a.router, a.db)
+	a.jsPluginManager = jsplugin.NewManager(jsPluginRepo, jsPluginsDir, jsPluginsDataDir, a.config.BasePath, a.router, a.db)
 	a.jsPluginManager.SetAuthService(a.authService, a.config.Port)
 
 	// 装配音源处理链:Fetcher → Resolver → Orchestrator
@@ -402,17 +403,25 @@ func (a *App) Start() error {
 		slog.Info("使用默认管理员账号密码启动")
 		slog.Info(fmt.Sprintf("默认管理员账号: %s，默认密码: %s", a.config.Username, a.config.Password))
 	}
-	slog.Info(fmt.Sprintf("HTTP 访问地址: http://localhost:%s", a.config.Port))
+	slog.Info(fmt.Sprintf("HTTP 访问地址: http://localhost:%s%s/", a.config.Port, a.config.BasePath))
 	slog.Info("服务器启动",
 		"version", version.GetVersion(),
 		"commit", version.GitCommit,
 		"build_time", version.BuildTime,
-		"port", a.config.Port)
-	err := http.ListenAndServe(":"+a.config.Port, a.router)
-	if err != nil {
-		return err
+		"port", a.config.Port,
+		"base_path", a.config.BasePath)
+
+	var handler http.Handler = a.router
+	if a.config.BasePath != "" {
+		mux := http.NewServeMux()
+		mux.Handle(a.config.BasePath+"/", http.StripPrefix(a.config.BasePath, a.router))
+		mux.HandleFunc(a.config.BasePath, func(w http.ResponseWriter, r *http.Request) {
+			http.Redirect(w, r, a.config.BasePath+"/", http.StatusMovedPermanently)
+		})
+		handler = mux
 	}
-	return nil
+
+	return http.ListenAndServe(":"+a.config.Port, handler)
 }
 
 // initJWTSecret 初始化JWT密钥
@@ -455,8 +464,25 @@ func (a *App) showHelp() {
 	fmt.Println("  ADMIN_PASSWORD  - 管理员密码（可通过 -password 参数指定）")
 	fmt.Println("  LISTEN_PORT     - 监听端口（默认: 58091，可通过 -port 参数指定）")
 	fmt.Println("  DB_PATH         - 数据库文件路径（默认: data/songloft.db，可通过 -db 参数指定）")
+	fmt.Println("  BASE_PATH       - URL 基础路径，用于反向代理子路径部署（如 /songloft，可通过 -base-path 参数指定）")
 	fmt.Println()
 	fmt.Println("注意: 其他配置（如音乐目录、扫描配置等）存储在数据库 config 表中")
+}
+
+// normalizeBasePath 规范化 base path：确保以 / 开头、不以 / 结尾，空或 "/" 返回空串
+func normalizeBasePath(raw string) (string, error) {
+	raw = strings.TrimSpace(raw)
+	if raw == "" || raw == "/" {
+		return "", nil
+	}
+	if strings.Contains(raw, "?") || strings.Contains(raw, "#") || strings.Contains(raw, "..") {
+		return "", fmt.Errorf("base-path 不能包含 '?', '#' 或 '..': %q", raw)
+	}
+	if !strings.HasPrefix(raw, "/") {
+		raw = "/" + raw
+	}
+	raw = strings.TrimRight(raw, "/")
+	return raw, nil
 }
 
 // ParseConfig 解析配置（从命令行参数和环境变量）
@@ -467,6 +493,7 @@ func ParseConfig() (*config.AppConfig, error) {
 		dbPath   = flag.String("db", "data/songloft.db", "数据库文件路径")
 		username = flag.String("username", "", "管理员用户名")
 		password = flag.String("password", "", "管理员密码")
+		basePath = flag.String("base-path", "", "URL 基础路径，用于反向代理子路径部署（如 /songloft）")
 		help     = flag.Bool("help", false, "显示帮助信息")
 		showVer  = flag.Bool("version", false, "显示版本信息")
 	)
@@ -529,11 +556,24 @@ func ParseConfig() (*config.AppConfig, error) {
 		}
 	}
 
+	// 获取 base path（优先使用命令行参数，其次使用环境变量）
+	finalBasePath := *basePath
+	if finalBasePath == "" {
+		if envBasePath := os.Getenv("BASE_PATH"); envBasePath != "" {
+			finalBasePath = envBasePath
+		}
+	}
+	normalizedBasePath, err := normalizeBasePath(finalBasePath)
+	if err != nil {
+		return nil, err
+	}
+
 	return &config.AppConfig{
 		Port:                    listenPort,
 		DBPath:                  finalDBPath,
 		Username:                adminUsername,
 		Password:                adminPassword,
+		BasePath:                normalizedBasePath,
 		UsingDefaultCredentials: usingDefaultCredentials,
 	}, nil
 }

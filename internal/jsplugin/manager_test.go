@@ -241,7 +241,7 @@ func TestManager_LoadPlugin(t *testing.T) {
 
 	// Create Manager and try to load
 	// Note: This test requires QuickJS runtime. Skip if not available.
-	manager := NewManager(repo, pluginsDir, dataDir, nil, nil)
+	manager := NewManager(repo, pluginsDir, dataDir, "", nil, nil)
 	t.Cleanup(func() { manager.Close() })
 
 	err := manager.LoadPlugin(ctx, plugin)
@@ -305,7 +305,7 @@ func TestManager_LoadPlugin_InvalidHash(t *testing.T) {
 		t.Fatalf("create plugin record: %v", err)
 	}
 
-	manager := NewManager(repo, pluginsDir, dataDir, nil, nil)
+	manager := NewManager(repo, pluginsDir, dataDir, "", nil, nil)
 	t.Cleanup(func() { manager.Close() })
 
 	err = manager.LoadPlugin(ctx, plugin)
@@ -345,7 +345,7 @@ func TestManager_UnloadPlugin(t *testing.T) {
 		t.Fatalf("create plugin record: %v", err)
 	}
 
-	manager := NewManager(repo, pluginsDir, dataDir, nil, nil)
+	manager := NewManager(repo, pluginsDir, dataDir, "", nil, nil)
 	t.Cleanup(func() { manager.Close() })
 
 	if err := manager.LoadPlugin(ctx, plugin); err != nil {
@@ -395,7 +395,7 @@ func TestManager_ReloadPlugin(t *testing.T) {
 		t.Fatalf("create plugin record: %v", err)
 	}
 
-	manager := NewManager(repo, pluginsDir, dataDir, nil, nil)
+	manager := NewManager(repo, pluginsDir, dataDir, "", nil, nil)
 	t.Cleanup(func() { manager.Close() })
 
 	if err := manager.LoadPlugin(ctx, plugin); err != nil {
@@ -444,7 +444,7 @@ func TestManager_EnableDisable(t *testing.T) {
 		t.Fatalf("create plugin record: %v", err)
 	}
 
-	manager := NewManager(repo, pluginsDir, dataDir, nil, nil)
+	manager := NewManager(repo, pluginsDir, dataDir, "", nil, nil)
 	t.Cleanup(func() { manager.Close() })
 
 	// Enable
@@ -713,7 +713,7 @@ func TestHealthChecker_DetectUnhealthy(t *testing.T) {
 		t.Fatalf("create plugin record: %v", err)
 	}
 
-	manager := NewManager(repo, pluginsDir, dataDir, nil, nil)
+	manager := NewManager(repo, pluginsDir, dataDir, "", nil, nil)
 	t.Cleanup(func() { manager.Close() })
 
 	if err := manager.LoadPlugin(ctx, plugin); err != nil {

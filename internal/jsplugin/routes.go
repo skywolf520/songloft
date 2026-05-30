@@ -285,7 +285,7 @@ func (m *Manager) tryServeStaticFile(w http.ResponseWriter, r *http.Request, sta
 			slog.Warn("jsplugin-static: 读取 HTML 失败", "absFile", absFile, "error", readErr)
 			return false
 		}
-		content = injectHTMLHead(content, entryPath)
+		content = injectHTMLHead(content, entryPath, m.basePath)
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
 		w.Header().Set("Cache-Control", "no-cache")
 		_, _ = w.Write(content)
@@ -308,8 +308,8 @@ func (m *Manager) tryServeStaticFile(w http.ResponseWriter, r *http.Request, sta
 // 刷新后正常是因为资源已缓存或浏览器重新解析时已知 base。
 //
 // 如果 HTML 中没有 <head> 标签，则在文件开头注入。
-func injectHTMLHead(html []byte, entryPath string) []byte {
-	baseTag := []byte(`<base href="/api/v1/jsplugin/` + entryPath + `/">`)
+func injectHTMLHead(html []byte, entryPath, basePath string) []byte {
+	baseTag := []byte(`<base href="` + basePath + `/api/v1/jsplugin/` + entryPath + `/">`)
 	authScript := []byte(authBridgeScriptTpl)
 	injectPayload := make([]byte, 0, len(baseTag)+len(authScript))
 	injectPayload = append(injectPayload, baseTag...)

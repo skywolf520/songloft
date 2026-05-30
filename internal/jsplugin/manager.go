@@ -38,6 +38,7 @@ type Manager struct {
 	services       sync.Map // map[string]*JSService (entryPath -> service)
 	pluginsDir     string   // data/jsplugins/
 	pluginsDataDir string   // data/jsplugins_data/
+	basePath       string   // URL 基础路径，用于反向代理子路径部署
 	router         chi.Router
 	db             database.DB           // 数据库访问
 	authService    *services.AuthService // 用于生成插件 JWT Token
@@ -53,7 +54,7 @@ type Manager struct {
 }
 
 // NewManager 创建 JS 插件管理器
-func NewManager(repo Repository, pluginsDir, pluginsDataDir string, router chi.Router, db database.DB) *Manager {
+func NewManager(repo Repository, pluginsDir, pluginsDataDir, basePath string, router chi.Router, db database.DB) *Manager {
 	m := &Manager{
 		repo:           repo,
 		packager:       NewPackageManager(pluginsDir, pluginsDataDir, repo),
@@ -61,6 +62,7 @@ func NewManager(repo Repository, pluginsDir, pluginsDataDir string, router chi.R
 		jsManager:      jsruntime.NewJSEnvManager(),
 		pluginsDir:     pluginsDir,
 		pluginsDataDir: pluginsDataDir,
+		basePath:       basePath,
 		router:         router,
 		db:             db,
 	}

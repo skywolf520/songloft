@@ -181,15 +181,33 @@ func (h *PlaylistHandler) UpdatePlaylist(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	var playlist models.Playlist
-	if err := json.NewDecoder(r.Body).Decode(&playlist); err != nil {
+	var req struct {
+		Name        string  `json:"name"`
+		Description string  `json:"description"`
+		CoverPath   *string `json:"cover_path"`
+		CoverURL    *string `json:"cover_url"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		respondError(w, http.StatusBadRequest, "无效的请求数据", err)
 		return
 	}
 
-	playlist.ID = id
+	existing, err := h.playlistService.GetByID(ctx, id)
+	if err != nil {
+		respondError(w, http.StatusNotFound, "歌单不存在", err)
+		return
+	}
 
-	if err := h.playlistService.Update(ctx, &playlist); err != nil {
+	existing.Name = req.Name
+	existing.Description = req.Description
+	if req.CoverPath != nil {
+		existing.CoverPath = *req.CoverPath
+	}
+	if req.CoverURL != nil {
+		existing.CoverURL = *req.CoverURL
+	}
+
+	if err := h.playlistService.Update(ctx, existing); err != nil {
 		if errors.Is(err, models.ErrPlaylistNameConflict) {
 			respondError(w, http.StatusConflict, "已存在同名歌单", err)
 			return
@@ -198,7 +216,7 @@ func (h *PlaylistHandler) UpdatePlaylist(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	respondJSON(w, http.StatusOK, playlist)
+	respondJSON(w, http.StatusOK, existing)
 }
 
 // TouchPlaylist 更新歌单的最后播放时间

@@ -1,3 +1,11 @@
+## [v2.2.5] - 2026-06-01
+### :memo: Documentation Changes
+- [`bb299cf`](https://github.com/songloft-org/songloft/commit/bb299cfa04725f097121c2e6d0fef366ceb86c05) - update CHANGELOG for v2.2.4 *(commit by [@github-actions[bot]](https://github.com/apps/github-actions))*
+
+### :wrench: Chores
+- [`64ca12c`](https://github.com/songloft-org/songloft/commit/64ca12c252de1147713f46940db8997889bd4065) - release version 2.2.5 *(commit by [@hanxi](https://github.com/hanxi))*
+
+
 ## [v2.2.4] - 2026-05-31
 ### :bug: Bug Fixes
 - [`cdaae98`](https://github.com/songloft-org/songloft/commit/cdaae98d90591dec626e64f7cc672e68da7873e4) - 修复ffmpeg转码问题 *(commit by [@hanxi](https://github.com/hanxi))*
@@ -993,3 +1001,4 @@
 [v2.2.2]: https://github.com/songloft-org/songloft/compare/v2.2.1...v2.2.2
 [v2.2.3]: https://github.com/songloft-org/songloft/compare/v2.2.2...v2.2.3
 [v2.2.4]: https://github.com/songloft-org/songloft/compare/v2.2.3...v2.2.4
+[v2.2.5]: https://github.com/songloft-org/songloft/compare/v2.2.4...v2.2.5

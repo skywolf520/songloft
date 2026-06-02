@@ -29,6 +29,22 @@ type SongUpdater interface {
 	UpdateSongDuration(ctx context.Context, id int64, duration float64) error
 }
 
+// ReassignSessionKey 标识触发 AsyncReassign 的客户端会话。
+// 与 playactivity.SessionKey 字段对应；source 包不直接依赖 playactivity，
+// 通过这个最小映射类型把会话信息透到 ReassignTracker.Track。
+type ReassignSessionKey struct {
+	ClientID string
+}
+
+// ReassignTracker 把 AsyncReassign 的 60s ctx 注册进上层 cancel 表，
+// 让用户切歌（同会话内 Activate(otherSongID)）时 reassign goroutine
+// 立即让位，不再阻塞插件 worker。
+//
+// 由 app/wire 阶段注入；nil 时退化为不跟踪（保持向后兼容）。
+type ReassignTracker interface {
+	Track(parent context.Context, sk ReassignSessionKey, songID int64, cat string) (context.Context, func())
+}
+
 // OrchestratorOpts 编排器配置。
 type OrchestratorOpts struct {
 	Fetcher     *SourceFetcher
@@ -41,6 +57,8 @@ type OrchestratorOpts struct {
 	FallbackJitter time.Duration // 默认 2s
 	// AsyncReassignDedupe 同一 songID 的 AsyncReassign 多次调用去重 TTL
 	AsyncReassignDedupe time.Duration // 默认 5min
+	// ActivityRegistry AsyncReassign 注入到上层 playActivity 的桥接接口；nil 时不跟踪。
+	ActivityRegistry ReassignTracker
 }
 
 // SourceOrchestrator 编排 Fetcher + Resolver + SongUpdater。
@@ -145,16 +163,25 @@ func (o *SourceOrchestrator) Fetch(ctx context.Context, song *SongInfo, mode Fet
 // 用于 cache HTTP handler 失败时:同步返回错误给客户端,后台静默切源。
 // 5 分钟内同一 songID 的多次调用会被去重。
 //
+// sk 标识触发本次 reassign 的客户端会话；若注入了 ActivityRegistry，
+// reassign goroutine 的 ctx 会注册到对应桶，用户切到其他歌时被一并 cancel。
+//
 // loader 由调用方提供(避免 source 包依赖 SongService 类型);它根据 ID 加载 SongInfo。
 // 加载失败时直接放弃。
-func (o *SourceOrchestrator) AsyncReassign(songID int64, loader func(context.Context, int64) (*SongInfo, error)) {
+func (o *SourceOrchestrator) AsyncReassign(songID int64, sk ReassignSessionKey, loader func(context.Context, int64) (*SongInfo, error)) {
 	if !o.tryAcquireReassign(songID) {
 		return
 	}
 	go func() {
 		defer o.releaseReassign(songID)
-		ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+		base, cancel := context.WithTimeout(context.Background(), 60*time.Second)
 		defer cancel()
+		ctx := base
+		if o.opts.ActivityRegistry != nil {
+			var release func()
+			ctx, release = o.opts.ActivityRegistry.Track(base, sk, songID, "reassign")
+			defer release()
+		}
 
 		song, err := loader(ctx, songID)
 		if err != nil || song == nil {

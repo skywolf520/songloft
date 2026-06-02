@@ -37,7 +37,7 @@ func seedSong(t *testing.T, repo *database.SongRepository, song *models.Song) in
 func TestNewSongHandler(t *testing.T) {
 	repo := newTestSongRepo(t)
 	songService := services.NewSongService(repo, nil, nil, nil, nil, nil)
-	handler := NewSongHandler(songService, nil, nil, nil, nil)
+	handler := NewSongHandler(songService, nil, nil, nil, nil, nil)
 
 	if handler == nil {
 		t.Error("NewSongHandler() returned nil")
@@ -48,7 +48,7 @@ func TestNewSongHandler(t *testing.T) {
 func TestListSongs(t *testing.T) {
 	repo := newTestSongRepo(t)
 	songService := services.NewSongService(repo, nil, nil, nil, nil, nil)
-	handler := NewSongHandler(songService, nil, nil, nil, nil)
+	handler := NewSongHandler(songService, nil, nil, nil, nil, nil)
 
 	seedSong(t, repo, &models.Song{Type: models.TypeLocal, Title: "歌曲1", FilePath: "/music/1.mp3"})
 	seedSong(t, repo, &models.Song{Type: models.TypeLocal, Title: "歌曲2", FilePath: "/music/2.mp3"})
@@ -75,7 +75,7 @@ func TestListSongs(t *testing.T) {
 func TestListSongsWithFilter(t *testing.T) {
 	repo := newTestSongRepo(t)
 	songService := services.NewSongService(repo, nil, nil, nil, nil, nil)
-	handler := NewSongHandler(songService, nil, nil, nil, nil)
+	handler := NewSongHandler(songService, nil, nil, nil, nil, nil)
 
 	seedSong(t, repo, &models.Song{Type: models.TypeLocal, Title: "歌曲1", FilePath: "/music/1.mp3"})
 	seedSong(t, repo, &models.Song{Type: models.TypeLocal, Title: "歌曲2", FilePath: "/music/2.mp3"})
@@ -102,7 +102,7 @@ func TestListSongsWithFilter(t *testing.T) {
 func TestGetSong(t *testing.T) {
 	repo := newTestSongRepo(t)
 	songService := services.NewSongService(repo, nil, nil, nil, nil, nil)
-	handler := NewSongHandler(songService, nil, nil, nil, nil)
+	handler := NewSongHandler(songService, nil, nil, nil, nil, nil)
 
 	id := seedSong(t, repo, &models.Song{Type: models.TypeLocal, Title: "测试歌曲", FilePath: "/music/test.mp3"})
 
@@ -131,7 +131,7 @@ func TestGetSong(t *testing.T) {
 func TestGetSongNotFound(t *testing.T) {
 	repo := newTestSongRepo(t)
 	songService := services.NewSongService(repo, nil, nil, nil, nil, nil)
-	handler := NewSongHandler(songService, nil, nil, nil, nil)
+	handler := NewSongHandler(songService, nil, nil, nil, nil, nil)
 
 	req := httptest.NewRequest("GET", "/api/v1/songs/999", nil)
 	rctx := chi.NewRouteContext()
@@ -151,7 +151,7 @@ func TestGetSongNotFound(t *testing.T) {
 func TestGetSongInvalidID(t *testing.T) {
 	repo := newTestSongRepo(t)
 	songService := services.NewSongService(repo, nil, nil, nil, nil, nil)
-	handler := NewSongHandler(songService, nil, nil, nil, nil)
+	handler := NewSongHandler(songService, nil, nil, nil, nil, nil)
 
 	req := httptest.NewRequest("GET", "/api/v1/songs/invalid", nil)
 	rctx := chi.NewRouteContext()
@@ -171,7 +171,7 @@ func TestGetSongInvalidID(t *testing.T) {
 func TestDeleteSong(t *testing.T) {
 	repo := newTestSongRepo(t)
 	songService := services.NewSongService(repo, nil, nil, nil, nil, nil)
-	handler := NewSongHandler(songService, nil, nil, nil, nil)
+	handler := NewSongHandler(songService, nil, nil, nil, nil, nil)
 
 	id := seedSong(t, repo, &models.Song{Type: models.TypeLocal, Title: "测试歌曲", FilePath: "/music/test.mp3"})
 	ctx := context.Background()
@@ -199,7 +199,7 @@ func TestDeleteSong(t *testing.T) {
 func TestAddRemoteSongs(t *testing.T) {
 	repo := newTestSongRepo(t)
 	songService := services.NewSongService(repo, nil, nil, nil, nil, nil)
-	handler := NewSongHandler(songService, nil, nil, nil, nil)
+	handler := NewSongHandler(songService, nil, nil, nil, nil, nil)
 
 	reqBody := []map[string]interface{}{
 		{
@@ -239,7 +239,7 @@ func TestAddRemoteSongs(t *testing.T) {
 func TestAddRemoteSongsMissingFields(t *testing.T) {
 	repo := newTestSongRepo(t)
 	songService := services.NewSongService(repo, nil, nil, nil, nil, nil)
-	handler := NewSongHandler(songService, nil, nil, nil, nil)
+	handler := NewSongHandler(songService, nil, nil, nil, nil, nil)
 
 	tests := []struct {
 		name string
@@ -270,7 +270,7 @@ func TestAddRemoteSongsMissingFields(t *testing.T) {
 func TestAddRadios(t *testing.T) {
 	repo := newTestSongRepo(t)
 	songService := services.NewSongService(repo, nil, nil, nil, nil, nil)
-	handler := NewSongHandler(songService, nil, nil, nil, nil)
+	handler := NewSongHandler(songService, nil, nil, nil, nil, nil)
 
 	reqBody := []map[string]string{
 		{
@@ -303,7 +303,7 @@ func TestAddRadios(t *testing.T) {
 func TestDeleteSongInvalidID(t *testing.T) {
 	repo := newTestSongRepo(t)
 	songService := services.NewSongService(repo, nil, nil, nil, nil, nil)
-	handler := NewSongHandler(songService, nil, nil, nil, nil)
+	handler := NewSongHandler(songService, nil, nil, nil, nil, nil)
 
 	req := httptest.NewRequest("DELETE", "/api/v1/songs/invalid", nil)
 	rctx := chi.NewRouteContext()
@@ -323,7 +323,7 @@ func TestDeleteSongInvalidID(t *testing.T) {
 func TestDeleteSongNotFound(t *testing.T) {
 	repo := newTestSongRepo(t)
 	songService := services.NewSongService(repo, nil, nil, nil, nil, nil)
-	handler := NewSongHandler(songService, nil, nil, nil, nil)
+	handler := NewSongHandler(songService, nil, nil, nil, nil, nil)
 
 	req := httptest.NewRequest("DELETE", "/api/v1/songs/999", nil)
 	rctx := chi.NewRouteContext()
@@ -345,7 +345,7 @@ func TestDeleteSongNotFound(t *testing.T) {
 func TestAddRadiosMissingFields(t *testing.T) {
 	repo := newTestSongRepo(t)
 	songService := services.NewSongService(repo, nil, nil, nil, nil, nil)
-	handler := NewSongHandler(songService, nil, nil, nil, nil)
+	handler := NewSongHandler(songService, nil, nil, nil, nil, nil)
 
 	tests := []struct {
 		name string
@@ -376,7 +376,7 @@ func TestAddRadiosMissingFields(t *testing.T) {
 func TestAddRadiosInvalidJSON(t *testing.T) {
 	repo := newTestSongRepo(t)
 	songService := services.NewSongService(repo, nil, nil, nil, nil, nil)
-	handler := NewSongHandler(songService, nil, nil, nil, nil)
+	handler := NewSongHandler(songService, nil, nil, nil, nil, nil)
 
 	req := httptest.NewRequest("POST", "/api/v1/songs/radio", bytes.NewReader([]byte("invalid json")))
 	req.Header.Set("Content-Type", "application/json")
@@ -393,7 +393,7 @@ func TestAddRadiosInvalidJSON(t *testing.T) {
 func TestAddRemoteSongsInvalidJSON(t *testing.T) {
 	repo := newTestSongRepo(t)
 	songService := services.NewSongService(repo, nil, nil, nil, nil, nil)
-	handler := NewSongHandler(songService, nil, nil, nil, nil)
+	handler := NewSongHandler(songService, nil, nil, nil, nil, nil)
 
 	req := httptest.NewRequest("POST", "/api/v1/songs/remote", bytes.NewReader([]byte("invalid json")))
 	req.Header.Set("Content-Type", "application/json")
@@ -410,7 +410,7 @@ func TestAddRemoteSongsInvalidJSON(t *testing.T) {
 func TestListSongsWithPagination(t *testing.T) {
 	repo := newTestSongRepo(t)
 	songService := services.NewSongService(repo, nil, nil, nil, nil, nil)
-	handler := NewSongHandler(songService, nil, nil, nil, nil)
+	handler := NewSongHandler(songService, nil, nil, nil, nil, nil)
 
 	seedSong(t, repo, &models.Song{Type: models.TypeLocal, Title: "歌曲1", FilePath: "/music/1.mp3"})
 	seedSong(t, repo, &models.Song{Type: models.TypeLocal, Title: "歌曲2", FilePath: "/music/2.mp3"})
@@ -439,7 +439,7 @@ func TestListSongsWithPagination(t *testing.T) {
 func TestListSongsInvalidPagination(t *testing.T) {
 	repo := newTestSongRepo(t)
 	songService := services.NewSongService(repo, nil, nil, nil, nil, nil)
-	handler := NewSongHandler(songService, nil, nil, nil, nil)
+	handler := NewSongHandler(songService, nil, nil, nil, nil, nil)
 
 	req := httptest.NewRequest("GET", "/api/v1/songs?limit=invalid&offset=invalid", nil)
 	rr := httptest.NewRecorder()

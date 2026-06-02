@@ -72,6 +72,13 @@ type ConvertService struct {
 	rngMu        sync.Mutex
 	musicPathFn  func() string // 获取最新 music_path 配置(响应配置变更)
 
+	// convertOneInflight 跨手动/自动模式的细粒度去重:同一(playlistID, songID)永远只允许一个 convertOne 在跑。
+	// 防止"自动模式 IsRunning(pid)=false 检查 与 手动模式 Start(pid) 几乎同时发生"导致的 race:
+	// 双方都通过 resolveTargetPath 拿到同一 dstPath、都 copyFile 落盘,后到方事务因 ReplaceSong
+	// ErrNotFound 回滚后 os.Remove(dstPath) 把先到方刚成功的文件删掉,造成 DB 引用悬空。
+	// key = "<playlistID>:<songID>"。
+	convertOneInflight sync.Map
+
 	// 内部 HTTP 调用解析相对路径用
 	urlResolver  *InternalURLResolver
 	httpClient   *http.Client  // 自动跟随重定向,用于下载 JS 插件的 music/url 端点
@@ -203,7 +210,7 @@ func (c *ConvertService) runPlaylistConvert(playlistID int64, playlistName strin
 
 		triggeredDownload, err := c.convertOne(ctx, playlistID, playlistName, song)
 		if err != nil {
-			if errors.Is(err, errSkipAlreadyLocal) {
+			if errors.Is(err, errSkipAlreadyLocal) || errors.Is(err, errSkipConcurrent) {
 				c.progressMgr.UpdateProgress(playlistID, song.Title, ConvertUpdateSkipped, "")
 			} else {
 				slog.Warn("convert song failed",
@@ -262,6 +269,9 @@ func (c *ConvertService) sleepInterruptible(d time.Duration, cancelCh <-chan str
 // errSkipAlreadyLocal 标记跳过非 remote 的歌曲
 var errSkipAlreadyLocal = errors.New("skip non-remote song")
 
+// errSkipConcurrent 标记同 (playlistID, songID) 已有 convertOne 在跑,跳过本次
+var errSkipConcurrent = errors.New("skip: convert already running for this (playlist, song)")
+
 // convertOne 转换单首歌曲到本地,返回是否触发了新下载
 func (c *ConvertService) convertOne(ctx context.Context, playlistID int64, playlistName string, song *models.Song) (bool, error) {
 	if song.Type != models.TypeRemote {
@@ -270,6 +280,14 @@ func (c *ConvertService) convertOne(ctx context.Context, playlistID int64, playl
 	if song.URL == "" && !song.IsPluginSourced() {
 		return false, fmt.Errorf("song has neither url nor plugin source")
 	}
+
+	// 跨手动/自动模式细粒度去重:同 (playlistID, songID) 只允许一个 convertOne 跑。
+	// 后到方直接退出,避免 dstPath 共享 + 事务回滚清盘破坏先到方的成果。
+	dedupKey := fmt.Sprintf("%d:%d", playlistID, song.ID)
+	if _, loaded := c.convertOneInflight.LoadOrStore(dedupKey, struct{}{}); loaded {
+		return false, errSkipConcurrent
+	}
+	defer c.convertOneInflight.Delete(dedupKey)
 
 	musicPath := c.musicPathFn()
 	if musicPath == "" {
@@ -281,13 +299,10 @@ func (c *ConvertService) convertOne(ctx context.Context, playlistID int64, playl
 	// 导致 ListLocalSongPaths 去重失败,重复 INSERT 同一首歌。
 
 	// 1. 确定文件来源
-	// 优先复用 cache_service 已缓存的文件;cache 未命中时,直接 HTTP GET
-	// 走"插件 URL → 跟随 302 到 cache endpoint → 真实 CDN"的完整链路,
-	// 把流落到临时文件供后续 copy。
-	// 不能复用 cache_service.DownloadToCache:它会先设 inflight,
-	// 然后 lxmusic 类插件检查 cache 时看到 inflight=200,误以为已缓存而
-	// 返回 302 到 cache endpoint,downloadClient 跟随回来再等 inflight,
-	// 形成自循环死锁。
+	// 优先复用 cache_service 已缓存的文件;cache 未命中时直接走 fetchToTemp:
+	// 插件 URL → 跟随 302 到 cache endpoint → 真实 CDN,把流落到临时文件供后续 copy。
+	// 历史背景:不能在转换路径上设 cache inflight——lxmusic 类插件检查 cache 时
+	// 看到 inflight 会误以为已缓存而返回 302 回 cache endpoint,形成自循环死锁。
 	var (
 		srcPath           string
 		tmpDownloadPath   string
@@ -466,8 +481,9 @@ func (c *ConvertService) convertOne(ctx context.Context, playlistID int64, playl
 }
 
 // OnCacheDownloaded 缓存下载完成回调(自动模式入口)。
-// 新签名按 song.ID 触发,由 SourceOrchestrator 在 Fetch 成功后调用。
-func (c *ConvertService) OnCacheDownloaded(songID int64, filePath string) {
+// 由 CacheService.Get 在"真正下载并落入 cache"成功后调用,触发自动转本地。
+// 不带 filePath 参数 —— convertOne 走 FindCachedFileBySong 重新定位即可。
+func (c *ConvertService) OnCacheDownloaded(songID int64) {
 	if !c.IsAutoConvertEnabled() {
 		return
 	}
@@ -507,7 +523,9 @@ func (c *ConvertService) OnCacheDownloaded(songID int64, filePath string) {
 			if err != nil || fresh.Type != models.TypeRemote {
 				continue
 			}
-			if _, err := c.convertOne(ctx, pid, playlist.Name, fresh); err != nil && !errors.Is(err, errSkipAlreadyLocal) {
+			if _, err := c.convertOne(ctx, pid, playlist.Name, fresh); err != nil &&
+				!errors.Is(err, errSkipAlreadyLocal) &&
+				!errors.Is(err, errSkipConcurrent) {
 				slog.Warn("auto convert one failed",
 					"playlistId", pid,
 					"songId", song.ID,

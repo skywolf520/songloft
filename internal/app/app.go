@@ -20,6 +20,7 @@ import (
 	"songloft/internal/jsplugin"
 	"songloft/internal/models"
 	"songloft/internal/services"
+	"songloft/internal/services/playactivity"
 	"songloft/internal/services/source"
 	"songloft/internal/tracelycfg"
 	"songloft/internal/version"
@@ -49,6 +50,7 @@ type App struct {
 	jsPluginManager    *jsplugin.Manager
 	sourceMetrics      *source.SourceMetrics
 	sourceOrchestrator *source.SourceOrchestrator
+	playActivity       *playactivity.Registry // 跨 song/会话 cancel 的全局表，处理快速切歌时旧请求的让位（issue #79）
 	webDist            embed.FS
 	tracelyClient      *tracely.Client
 	logLevelVar        *slog.LevelVar // 全局 slog 等级动态切换；由 /settings/log-level 即时 Set
@@ -303,18 +305,23 @@ func (a *App) Init() error {
 		},
 	})
 	sourceResolver := source.NewSourceResolver(listerAdapter, invokerAdapter, a.sourceMetrics, source.DefaultResolverOpts())
+	// playActivity 跟踪所有"和某首歌相关"的进行中工作（play/prefetch/transcode/reassign），
+	// 让用户切歌时同会话下旧工作集体退场。issue #79：快速切歌时旧请求一直占着 plugin worker。
+	a.playActivity = playactivity.New()
+
 	sourceOrchestrator := source.NewSourceOrchestrator(source.OrchestratorOpts{
-		Fetcher:     sourceFetcher,
-		Resolver:    sourceResolver,
-		SongUpdater: songUpdaterAdapter,
+		Fetcher:          sourceFetcher,
+		Resolver:         sourceResolver,
+		SongUpdater:      songUpdaterAdapter,
+		ActivityRegistry: &playActivityReassignTracker{reg: a.playActivity},
 	})
 	a.sourceOrchestrator = sourceOrchestrator
 	a.cacheService.SetOrchestrator(sourceOrchestrator)
 	a.convertService.SetOrchestrator(sourceOrchestrator)
-
-	// TODO(orchestrator): 缓存下载完成回调链已废弃,由 SourceOrchestrator 在 Fetch 成功后
-	// 内联调用 UpdateSongDuration 和触发自动转换。当前过渡期内,网络歌曲下载与自动转换功能尚未恢复,
-	// 待 SourceOrchestrator/SourceFetcher 等模块实现后接通。
+	// 缓存下载完成 → 触发自动转本地(由 ConvertService 内部按开关 + 歌曲状态判断是否真正执行)。
+	// 手动批量转换走 ConvertService.convertOne 直连 Orchestrator,绕开 CacheService.Get,
+	// 不会重复触发;AsyncReassign 不下载到 cache,也不会误触发。
+	a.cacheService.SetOnDownloaded(a.convertService.OnCacheDownloaded)
 
 	// 初始化 Tracely 监控客户端（仅在编译时注入了 AppSecret 与 Host 时启用）
 	if tracelycfg.Enabled() {

@@ -234,7 +234,7 @@ func (h *XxxHandler) Method(w http.ResponseWriter, r *http.Request) { ... }
 
 - 落地路径：`music_path/{清理后歌单名}/{清理后艺术家} - {清理后标题}.{ext}`，与 scanner 保持**相对路径**格式
   - **不要** `filepath.Abs`，否则重扫去重失败，产生重复 song
-- cache miss 时**不走** `cache_service.DownloadToCache`，走 `convert_service.fetchToTemp` 直接 HTTP GET
+- cache miss 时走 `convert_service.fetchToTemp` 直接 HTTP GET，**不**经过 `cache_service` 的 inflight
   - 原因：部分 JS 插件的 `music/url/{hash}` 在 cache inflight 时会 302 回 cache endpoint → 自循环死锁
 - 转换时把 song.URL 相对路径拼成 `http://127.0.0.1:{port}/...?access_token={plugin_token}`（用 `authService.GeneratePluginToken`）
 - 手动批量：cache miss 触发新下载后串行 `sleep 3s + 0-2s jitter` 防风控；cache 命中不限速

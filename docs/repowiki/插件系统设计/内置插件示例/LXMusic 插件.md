@@ -283,15 +283,9 @@ Handler-->>Client : 返回导入结果
 Client->>Handler : GET /api/music/url/{hash}
 Handler->>Store : Get(hash)
 Store-->>Handler : mapping
-Handler->>Cache : FindCachedFile(hash)
-alt 命中
-Cache-->>Handler : 返回缓存
-else 未命中
 Handler->>RuntimeM : GetMusicUrl(platform, quality, musicInfo)
 RuntimeM-->>Handler : URL
-Handler->>Cache : DownloadAndCache(hash, url)
-Cache-->>Handler : 返回响应
-end
+Handler-->>Client : 302 重定向到 URL（缓存由后端 CacheService.Get 按 song.ID 索引）
 Handler-->>Client : 返回播放响应
 ```
 

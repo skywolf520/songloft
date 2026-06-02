@@ -17,6 +17,7 @@ import (
 	"songloft/internal/database"
 	"songloft/internal/models"
 	"songloft/internal/services"
+	"songloft/internal/services/playactivity"
 
 	"github.com/go-chi/chi/v5"
 )
@@ -28,6 +29,7 @@ type SongHandler struct {
 	reassigner   AsyncReassigner
 	lyricFetcher *services.LyricFetcher // 解包插件 JSON 拿 LRC 文本(歌词 url 分支用)
 	hlsHandler   *HLSHandler            // 电台 HLS 流的反代委托（开关在 HLSHandler 内）
+	playActivity *playactivity.Registry // 跟踪进行中的 play/prefetch/transcode/reassign 工作，用户切歌时一次性 cancel
 }
 
 // NewSongHandler 创建歌曲处理器
@@ -37,6 +39,7 @@ func NewSongHandler(
 	reassigner AsyncReassigner,
 	lyricFetcher *services.LyricFetcher,
 	hlsHandler *HLSHandler,
+	playActivity *playactivity.Registry,
 ) *SongHandler {
 	return &SongHandler{
 		songService:  songService,
@@ -44,6 +47,7 @@ func NewSongHandler(
 		reassigner:   reassigner,
 		lyricFetcher: lyricFetcher,
 		hlsHandler:   hlsHandler,
+		playActivity: playActivity,
 	}
 }
 
@@ -342,7 +346,7 @@ func (h *SongHandler) UpdateSong(w http.ResponseWriter, r *http.Request) {
 // @Tags 歌曲管理
 // @Accept json
 // @Produce json
-// @Param request body []object{url=string,title=string,artist=string,album=string,cover_url=string,duration=number,cache_hash=string} true "网络歌曲列表"
+// @Param request body []object{url=string,title=string,artist=string,album=string,cover_url=string,duration=number,plugin_entry_path=string,source_data=string,dedup_key=string,lyric=string,lyric_source=string} true "网络歌曲列表"
 // @Success 201 {object} object{songs=[]models.Song,count=int} "添加成功"
 // @Failure 400 {object} map[string]string "请求数据错误"
 // @Failure 500 {object} map[string]string "添加失败"
@@ -684,6 +688,15 @@ func (h *SongHandler) GetSongPlay(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// 用户进入正式播放路径时，让该客户端会话下其他歌曲的进行中工作集体退场
+	// （prefetch / transcode / reassign），避免它们继续占用 plugin worker / 转码 sem。
+	// 仅 prefetch 旁路跳过 Activate，因为 prefetch 自己也注册到 registry，
+	// 让它由后续真实播放或下一次 prefetch 触发清理。
+	sk := playactivity.SessionFromContext(r.Context())
+	if r.URL.Query().Get("prefetch") != "1" && h.playActivity != nil {
+		h.playActivity.Activate(sk, songID)
+	}
+
 	ctx := r.Context()
 	song, err := h.songService.GetByID(ctx, songID)
 	if err != nil || song == nil {
@@ -695,8 +708,14 @@ func (h *SongHandler) GetSongPlay(w http.ResponseWriter, r *http.Request) {
 
 	// 预拉取模式：异步触发缓存 + 转码预热，立即返回 202。
 	// 不能用 r.Context()，否则 202 发出后客户端断开会 Kill ffmpeg，预热失败。
+	// 但通过 playActivity.Track 让 prefetch 能在下一次 Activate 时被 cancel，
+	// 避免占着 plugin worker 跑完整 30s。
 	if r.URL.Query().Get("prefetch") == "1" {
-		go h.prepareSongPlayback(context.Background(), song, targetFormat)
+		go func() {
+			pctx, release := h.trackActivity(context.Background(), sk, song.ID, playactivity.CatPrefetch)
+			defer release()
+			h.prepareSongPlayback(pctx, song, targetFormat)
+		}()
 		w.WriteHeader(http.StatusAccepted)
 		return
 	}
@@ -711,6 +730,47 @@ func (h *SongHandler) GetSongPlay(w http.ResponseWriter, r *http.Request) {
 	default:
 		http.Error(w, "unsupported song type", http.StatusInternalServerError)
 	}
+}
+
+// trackActivity 是 playActivity.Track 的兜底封装：当 registry 未注入（旧测试 / lite 模式）时
+// 退化为返回 parent ctx + no-op release，调用方代码无需到处加 nil 判断。
+func (h *SongHandler) trackActivity(parent context.Context, sk playactivity.SessionKey, songID int64, cat playactivity.Category) (context.Context, func()) {
+	if h.playActivity == nil {
+		return parent, func() {}
+	}
+	return h.playActivity.Track(parent, sk, songID, cat)
+}
+
+// ActivateSong 把指定歌曲标记为该客户端会话的"当前活跃歌曲"。
+//
+// 客户端在切歌前调用一次：后端会立刻 cancel 该会话下其他歌曲的进行中工作
+// （prefetch / transcode / reassign），让插件 worker 与转码 sem 立即让位给新歌。
+// 不依赖客户端关闭旧的 HTTP 流（just_audio LockCachingAudioSource 不会主动 abort），
+// 是 issue #79 残留卡顿的关键解药。
+//
+// 幂等：重复调用同一 songID 无副作用；调用时如果该会话桶已经空了也不报错。
+//
+// @Summary 标记当前活跃歌曲
+// @Description 客户端切歌前调用，让后端 cancel 同一会话下其他歌曲的进行中工作（prefetch/transcode/reassign）。其他客户端会话不受影响。
+// @Tags 歌曲管理
+// @Produce json
+// @Param id path int true "歌曲 ID"
+// @Success 204 "无内容"
+// @Failure 400 {object} map[string]string "无效的 song_id"
+// @Security BearerAuth
+// @Router /songs/{id}/activate [post]
+func (h *SongHandler) ActivateSong(w http.ResponseWriter, r *http.Request) {
+	idStr := chi.URLParam(r, "id")
+	songID, err := strconv.ParseInt(idStr, 10, 64)
+	if err != nil || songID <= 0 {
+		respondError(w, http.StatusBadRequest, "无效的 song_id", err)
+		return
+	}
+	if h.playActivity != nil {
+		sk := playactivity.SessionFromContext(r.Context())
+		h.playActivity.Activate(sk, songID)
+	}
+	w.WriteHeader(http.StatusNoContent)
 }
 
 // prepareSongPlayback 后台预热一首歌曲：拉取到缓存 + 必要时转码。
@@ -761,10 +821,14 @@ func (h *SongHandler) serveLocal(w http.ResponseWriter, r *http.Request, song *m
 	srcPath := song.FilePath
 	if services.NeedsTranscode(services.EffectiveSourceFormat(song, srcPath), targetFormat) {
 		// 转码用独立 context：避免客户端断开导致 ffmpeg 被 SIGKILL，
-		// 完成后结果缓存，下次请求直接命中。
+		// 完成后结果缓存，下次请求直接命中。同时把转码 ctx 注册到 playActivity，
+		// 用户切到其他歌曲时可由 Activate(otherID) 主动 cancel，让 ffmpeg/transcodeSem 释放。
 		tcCtx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
 		defer cancel()
-		path, err := h.cacheService.GetOrTranscode(tcCtx, srcPath, song, services.NormalizeFormat(targetFormat))
+		sk := playactivity.SessionFromContext(r.Context())
+		trackedCtx, release := h.trackActivity(tcCtx, sk, song.ID, playactivity.CatTranscode)
+		defer release()
+		path, err := h.cacheService.GetOrTranscode(trackedCtx, srcPath, song, services.NormalizeFormat(targetFormat))
 		if err != nil {
 			slog.Warn("transcode failed, serving original", "songId", song.ID, "format", targetFormat, "error", err)
 		} else {
@@ -859,11 +923,18 @@ func (h *SongHandler) serveRemote(w http.ResponseWriter, r *http.Request, song *
 		return
 	}
 
-	cachedPath, err := h.cacheService.Get(r.Context(), song)
+	// 把 cache.Get 注册到 playActivity（CatPlay）：用户切到其他歌时，
+	// Activate(otherID) 会 cancel 同会话下其他 songID 的所有工作（含此 ctx）；
+	// 但不会 cancel 自己（同 songID 的 CatPlay）。
+	sk := playactivity.SessionFromContext(r.Context())
+	playCtx, releasePlay := h.trackActivity(r.Context(), sk, song.ID, playactivity.CatPlay)
+	defer releasePlay()
+
+	cachedPath, err := h.cacheService.Get(playCtx, song)
 	if err != nil {
 		slog.Warn("cache get failed", "songId", song.ID, "type", song.Type, "error", err)
 		if h.reassigner != nil && song.IsPluginSourced() {
-			h.reassigner.AsyncReassign(song.ID)
+			h.reassigner.AsyncReassign(song.ID, sk)
 		}
 		http.Error(w, "source unavailable: "+err.Error(), http.StatusBadGateway)
 		return
@@ -872,7 +943,9 @@ func (h *SongHandler) serveRemote(w http.ResponseWriter, r *http.Request, song *
 	if services.NeedsTranscode(services.EffectiveSourceFormat(song, cachedPath), targetFormat) {
 		tcCtx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
 		defer cancel()
-		path, err := h.cacheService.GetOrTranscode(tcCtx, cachedPath, song, services.NormalizeFormat(targetFormat))
+		trackedCtx, releaseTc := h.trackActivity(tcCtx, sk, song.ID, playactivity.CatTranscode)
+		defer releaseTc()
+		path, err := h.cacheService.GetOrTranscode(trackedCtx, cachedPath, song, services.NormalizeFormat(targetFormat))
 		if err != nil {
 			slog.Warn("transcode failed, serving original", "songId", song.ID, "format", targetFormat, "error", err)
 		} else {

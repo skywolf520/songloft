@@ -54,7 +54,13 @@ func (c *CacheService) GetOrTranscode(ctx context.Context, srcPath string, song 
 	state.transcodeInflightMu.Lock()
 	if dl, ok := state.transcodeInflight[inflightKey]; ok {
 		state.transcodeInflightMu.Unlock()
-		<-dl.done
+		// 等待首转码完成；同时监听本等待者自己的 ctx，防止首转码卡住时
+		// 后续等待者也被拖死（issue #79 残留点）。
+		select {
+		case <-dl.done:
+		case <-ctx.Done():
+			return "", ctx.Err()
+		}
 		if dl.err != nil {
 			return "", dl.err
 		}

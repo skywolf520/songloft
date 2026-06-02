@@ -42,6 +42,7 @@ func (a *App) setupAPIV1Router() {
 		&reassignAdapter{orch: a.sourceOrchestrator, s: a.songService},
 		a.lyricFetcher,
 		hlsHandler,
+		a.playActivity,
 	)
 	playlistHandler := handlers.NewPlaylistHandler(a.playlistService)
 	configHandler := handlers.NewConfigHandler(a.configService)
@@ -114,6 +115,7 @@ func (a *App) setupAPIV1Router() {
 			r.Put("/songs/{id}", songHandler.UpdateSong)
 			r.Delete("/songs/{id}", songHandler.DeleteSong)
 			r.Put("/songs/{id}/lyrics", songHandler.UpdateSongLyrics)
+			r.Post("/songs/{id}/activate", songHandler.ActivateSong)
 
 			// 歌单管理模块
 			backupHandler := handlers.NewBackupHandler(a.backupService)

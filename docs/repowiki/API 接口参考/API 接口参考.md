@@ -239,7 +239,7 @@ H-->>C : "200 JSON"
   - 响应体：message、count
   - 错误：500（清理失败）
 
-**更新** 新增 cache_hash 字段，用于远程歌曲的去重和缓存管理；歌词源枚举新增 'url' 和 'cached' 选项
+**更新** 歌词源枚举新增 'url' 和 'cached' 选项
 
 ```mermaid
 flowchart TD

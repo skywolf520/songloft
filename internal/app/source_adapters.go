@@ -5,6 +5,7 @@ import (
 
 	"songloft/internal/jsplugin"
 	"songloft/internal/services"
+	"songloft/internal/services/playactivity"
 	"songloft/internal/services/source"
 )
 
@@ -71,15 +72,15 @@ func (a *songUpdaterAdapter) UpdateSongDuration(ctx context.Context, id int64, d
 }
 
 // reassignAdapter 包装 source.SourceOrchestrator + services.SongService,
-// 给 cache handler 提供一个简单的 AsyncReassign(songID) 接口。
+// 给 cache handler 提供一个 AsyncReassign(songID, sk) 接口。
 // 把"按 id 加载 song"这个职责从 source 包剥离到这里。
 type reassignAdapter struct {
 	orch *source.SourceOrchestrator
 	s    *services.SongService
 }
 
-func (a *reassignAdapter) AsyncReassign(songID int64) {
-	a.orch.AsyncReassign(songID, func(ctx context.Context, id int64) (*source.SongInfo, error) {
+func (a *reassignAdapter) AsyncReassign(songID int64, sk playactivity.SessionKey) {
+	a.orch.AsyncReassign(songID, source.ReassignSessionKey{ClientID: sk.ClientID}, func(ctx context.Context, id int64) (*source.SongInfo, error) {
 		song, err := a.s.GetByID(ctx, id)
 		if err != nil || song == nil {
 			return nil, err
@@ -94,4 +95,18 @@ func (a *reassignAdapter) AsyncReassign(songID int64) {
 			SourceData:      song.SourceData,
 		}, nil
 	})
+}
+
+// playActivityReassignTracker 把 playactivity.Registry 适配到 source.ReassignTracker，
+// 让 source 包不直接依赖 playactivity 包。category 用 string 透传，wrapper 内固定为
+// playactivity.CatReassign。
+type playActivityReassignTracker struct {
+	reg *playactivity.Registry
+}
+
+func (t *playActivityReassignTracker) Track(parent context.Context, sk source.ReassignSessionKey, songID int64, _ string) (context.Context, func()) {
+	if t == nil || t.reg == nil {
+		return parent, func() {}
+	}
+	return t.reg.Track(parent, playactivity.SessionKey{ClientID: sk.ClientID}, songID, playactivity.CatReassign)
 }

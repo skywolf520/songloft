@@ -3893,14 +3893,26 @@ const docTemplate = `{
                                     "artist": {
                                         "type": "string"
                                     },
-                                    "cache_hash": {
+                                    "cover_url": {
                                         "type": "string"
                                     },
-                                    "cover_url": {
+                                    "dedup_key": {
                                         "type": "string"
                                     },
                                     "duration": {
                                         "type": "number"
+                                    },
+                                    "lyric": {
+                                        "type": "string"
+                                    },
+                                    "lyric_source": {
+                                        "type": "string"
+                                    },
+                                    "plugin_entry_path": {
+                                        "type": "string"
+                                    },
+                                    "source_data": {
+                                        "type": "string"
                                     },
                                     "title": {
                                         "type": "string"
@@ -4141,6 +4153,46 @@ const docTemplate = `{
                     },
                     "500": {
                         "description": "删除失败",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/songs/{id}/activate": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "客户端切歌前调用，让后端 cancel 同一会话下其他歌曲的进行中工作（prefetch/transcode/reassign）。其他客户端会话不受影响。",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "歌曲管理"
+                ],
+                "summary": "标记当前活跃歌曲",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "歌曲 ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "无内容"
+                    },
+                    "400": {
+                        "description": "无效的 song_id",
                         "schema": {
                             "type": "object",
                             "additionalProperties": {

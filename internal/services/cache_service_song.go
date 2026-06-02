@@ -59,6 +59,13 @@ func (c *CacheService) SetOrchestrator(o CacheSongFetcher) {
 	c.orchestrator = o
 }
 
+// SetOnDownloaded 注入缓存下载完成回调。
+// 仅在 Get 路径"真正下载并落入 cache"成功时触发;命中已存在缓存不触发。
+// 用于把"自动转本地"等下游副作用与 cache 主流程解耦。
+func (c *CacheService) SetOnDownloaded(fn func(songID int64)) {
+	c.onDownloaded = fn
+}
+
 // ErrNoOrchestrator orchestrator 未注入
 var ErrNoOrchestrator = errors.New("source orchestrator not configured")
 
@@ -233,8 +240,13 @@ func (c *CacheService) Get(ctx context.Context, song *models.Song) (string, erro
 		}
 		state.inflightMu.Unlock()
 
-		// 等待已存在的 inflight 完成
-		<-dl.done
+		// 等待已存在的 inflight 完成；同时监听本等待者自己的 ctx，
+		// 防止首请求卡住时把第二、三个等待者也一起拖死（issue #79 残留点）。
+		select {
+		case <-dl.done:
+		case <-ctx.Done():
+			return "", ctx.Err()
+		}
 		if dl.err != nil {
 			if errors.Is(dl.err, context.Canceled) || errors.Is(dl.err, context.DeadlineExceeded) {
 				// 首请求被自己的 ctx 取消，不算"真错误"，本等待者重新尝试占位下载
@@ -303,6 +315,10 @@ func (c *CacheService) Get(ctx context.Context, song *models.Song) (string, erro
 	c.touchSongLRU(song.ID)
 	// 触发 LRU 淘汰
 	go c.EvictLRU()
+	// 通知下游(自动转本地等)。回调内部自带 goroutine + 去重,这里直接同步调即可。
+	if c.onDownloaded != nil {
+		c.onDownloaded(song.ID)
+	}
 	return finalPath, nil
 }
 

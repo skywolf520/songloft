@@ -747,9 +747,8 @@ func (s *SongService) UpdateLyrics(ctx context.Context, id int64, lyric, lyricSo
 	return WriteSongTags(song.FilePath, song), nil
 }
 
-// UpdateSongDuration 按 song ID 回填时长（仅在原 duration 为 0 时生效）
-// 取代了旧的 BackfillDuration(原来是 cache 下载完后回调驱动,
-// 新架构下由 SourceOrchestrator 在 Fetch 成功后内联调用)。
+// UpdateSongDuration 按 song ID 回填时长（仅在原 duration 为 0 时生效）。
+// 由 SourceOrchestrator 在 Fetch 成功后内联调用。
 func (s *SongService) UpdateSongDuration(ctx context.Context, id int64, duration float64) error {
 	return s.songs.UpdateDuration(ctx, id, duration)
 }

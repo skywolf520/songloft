@@ -6,6 +6,7 @@ import (
 	"net/http"
 
 	"songloft/internal/services"
+	"songloft/internal/services/playactivity"
 )
 
 // CacheHandler 音乐缓存管理处理器。
@@ -17,8 +18,12 @@ type CacheHandler struct {
 }
 
 // AsyncReassigner 抽象 SourceOrchestrator.AsyncReassign(避免 handlers 依赖 source 包)
+//
+// sk 标识当前请求的客户端会话(由 playactivity.SessionFromContext 提取)，
+// 让 reassign 后台任务的 ctx 注册到该会话桶——用户切到其他歌时被一并 cancel，
+// 不会与新切歌的 plugin worker 抢占。
 type AsyncReassigner interface {
-	AsyncReassign(songID int64)
+	AsyncReassign(songID int64, sk playactivity.SessionKey)
 }
 
 // NewCacheHandler 创建缓存管理处理器。

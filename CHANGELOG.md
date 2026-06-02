@@ -1,3 +1,25 @@
+## [v2.4.0] - 2026-06-02
+### :sparkles: New Features
+- [`4f80073`](https://github.com/songloft-org/songloft/commit/4f80073d09ee93e0923593b28c2f4179d5dfdcfc) - 规范设置接口 *(commit by [@hanxi](https://github.com/hanxi))*
+- [`7ff3c77`](https://github.com/songloft-org/songloft/commit/7ff3c7722befdf407018c4950bc06a6fbac1bbfa) - 支持设置日志等级 *(commit by [@hanxi](https://github.com/hanxi))*
+- [`d3b48ac`](https://github.com/songloft-org/songloft/commit/d3b48ac9442d6bf15c09ca42a3d3bdfccf86a419) - 新增歌词调整 songloft-org/songloft[#49](https://github.com/songloft-org/songloft/pull/49) *(commit by [@hanxi](https://github.com/hanxi))*
+- [`b1acd65`](https://github.com/songloft-org/songloft/commit/b1acd65496668ea58e6806c303df0693b869ab17) - 继续优化快速切歌卡顿问题 [#49](https://github.com/songloft-org/songloft/pull/49) *(commit by [@hanxi](https://github.com/hanxi))*
+- [`1df746a`](https://github.com/songloft-org/songloft/commit/1df746a6ab63fff9e6d4cc6416f1829315071c71) - 网络歌单转本地优化 *(commit by [@hanxi](https://github.com/hanxi))*
+
+### :bug: Bug Fixes
+- [`c0751a2`](https://github.com/songloft-org/songloft/commit/c0751a255811916d0affee9326778ca641341a89) - 解决m3u8格式的电台无法播放问题 *(commit by [@hanxi](https://github.com/hanxi))*
+- [`aca70a4`](https://github.com/songloft-org/songloft/commit/aca70a459c805b0f14f0633043532f9966362b7c) - access log 改用 slog 输出，解决日志等级控制问题 *(commit by [@hanxi](https://github.com/hanxi))*
+
+### :construction_worker: Build System
+- [`24d74cb`](https://github.com/songloft-org/songloft/commit/24d74cb64ce356ebbfbeeae853d6a53776ce9169) - update *(commit by [@hanxi](https://github.com/hanxi))*
+
+### :memo: Documentation Changes
+- [`0a5af24`](https://github.com/songloft-org/songloft/commit/0a5af24aee6f32d81dd02acc302fddc60bbb1e0e) - update CHANGELOG for v2.3.0 *(commit by [@github-actions[bot]](https://github.com/apps/github-actions))*
+
+### :wrench: Chores
+- [`4995c2b`](https://github.com/songloft-org/songloft/commit/4995c2b7c529d99661d9386f87c7ce150acb4f78) - release version 2.4.0 *(commit by [@hanxi](https://github.com/hanxi))*
+
+
 ## [v2.3.0] - 2026-06-01
 ### :sparkles: New Features
 - [`dad2d9c`](https://github.com/songloft-org/songloft/commit/dad2d9cbd100d93bfcb8dce17c408480e32ec562) - 电台支持走后端代理 *(commit by [@hanxi](https://github.com/hanxi))*
@@ -1019,3 +1041,4 @@
 [v2.2.4]: https://github.com/songloft-org/songloft/compare/v2.2.3...v2.2.4
 [v2.2.5]: https://github.com/songloft-org/songloft/compare/v2.2.4...v2.2.5
 [v2.3.0]: https://github.com/songloft-org/songloft/compare/v2.2.5...v2.3.0
+[v2.4.0]: https://github.com/songloft-org/songloft/compare/v2.3.0...v2.4.0

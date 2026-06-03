@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 	"time"
 
@@ -404,24 +405,28 @@ func (s *SongService) doScanAndImport(ctx context.Context, reimport bool) {
 		close(resultCh)
 	}()
 
-	batch := make([]scanExtractResult, 0, dbBatchSize)
+	allResults := make([]scanExtractResult, 0, len(toProcess))
+	cancelled := false
 	for result := range resultCh {
 		select {
 		case <-cancelCh:
-			s.scanProgressManager.SetCancelled()
-			return
+			cancelled = true
 		default:
 		}
-
-		batch = append(batch, result)
-		if len(batch) >= dbBatchSize {
-			s.flushScanBatch(ctx, batch, reimport)
-			batch = batch[:0]
+		if !cancelled {
+			allResults = append(allResults, result)
 		}
 	}
+	if cancelled {
+		s.scanProgressManager.SetCancelled()
+		return
+	}
 
-	if len(batch) > 0 {
-		s.flushScanBatch(ctx, batch, reimport)
+	fixSpamTags(allResults)
+
+	for i := 0; i < len(allResults); i += dbBatchSize {
+		end := min(i+dbBatchSize, len(allResults))
+		s.flushScanBatch(ctx, allResults[i:end], reimport)
 	}
 
 	select {
@@ -450,6 +455,55 @@ func (s *SongService) runAutoCreatePlaylists(ctx context.Context) {
 
 	if _, err := s.playlistAutoCreator.AutoCreate(ctx, includeSubdirs); err != nil {
 		slog.Warn("自动创建歌单失败", "include_subdirs", includeSubdirs, "error", err)
+	}
+}
+
+// fixSpamTags 检测同目录下大量文件拥有完全相同的 (title, artist) 的情况，
+// 判定为垃圾 tag（如广告），回退到用文件名作为标题。
+func fixSpamTags(results []scanExtractResult) {
+	type tagKey struct{ title, artist string }
+
+	dirGroups := make(map[string][]int)
+	for i, r := range results {
+		dir := filepath.Dir(r.item.filePath)
+		dirGroups[dir] = append(dirGroups[dir], i)
+	}
+
+	for dir, indices := range dirGroups {
+		total := len(indices)
+		counts := make(map[tagKey]int)
+		for _, i := range indices {
+			m := results[i].metadata
+			if m.Title == "" && m.Artist == "" {
+				continue
+			}
+			counts[tagKey{m.Title, m.Artist}]++
+		}
+
+		var spamKey tagKey
+		var spamCount int
+		for k, c := range counts {
+			if c > spamCount {
+				spamKey = k
+				spamCount = c
+			}
+		}
+
+		if spamCount < 3 || float64(spamCount)/float64(total) <= 0.5 {
+			continue
+		}
+
+		slog.Warn("检测到疑似垃圾 tag，回退到文件名",
+			"dir", dir, "spamTitle", spamKey.title, "spamArtist", spamKey.artist, "count", spamCount, "total", total)
+
+		for _, i := range indices {
+			m := results[i].metadata
+			if m.Title == spamKey.title && m.Artist == spamKey.artist {
+				fileName := strings.TrimSuffix(filepath.Base(results[i].item.filePath), filepath.Ext(results[i].item.filePath))
+				m.Title = fileName
+				m.Artist = ""
+			}
+		}
 	}
 }
 

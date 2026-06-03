@@ -123,7 +123,7 @@ func ServeRemoteResource(w http.ResponseWriter, r *http.Request, resourceURL str
 		http.Error(w, "resource fetch failed", http.StatusInternalServerError)
 		return
 	}
-	
+
 	// 处理 Basic Auth
 	if upstreamReq.URL.User != nil {
 		password, _ := upstreamReq.URL.User.Password()

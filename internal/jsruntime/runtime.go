@@ -26,6 +26,8 @@ import (
 	"sync/atomic"
 	"time"
 
+	"songloft/internal/httputil"
+
 	"modernc.org/quickjs"
 )
 
@@ -1530,6 +1532,8 @@ func doHTTPRequest(url, method, headersJSON, body string) string {
 	if req.Header.Get("User-Agent") == "" {
 		req.Header.Set("User-Agent", "MiHome/6.0 (Linux; Android 10; Redmi Note 5 Build/QQ3A.200805.001)")
 	}
+	httputil.ApplyBasicAuthFromURL(req)
+	url = req.URL.String()
 
 	// 诊断日志：记录实际发送的请求头（X-Fetch-No-Redirect 已剥离，默认头已补充）
 	actualHeaders := make(map[string]string)

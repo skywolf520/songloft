@@ -9,6 +9,8 @@ import (
 	"net/http"
 	"os"
 	"time"
+
+	"songloft/internal/httputil"
 )
 
 // Prober 是 MetadataExtractor.ProbeForValidation 的抽象。
@@ -259,6 +261,7 @@ func (f *SourceFetcher) downloadToTemp(ctx context.Context, url string) (string,
 		return "", 0, fmt.Errorf("new request: %w", err)
 	}
 	req.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
+	httputil.ApplyBasicAuthFromURL(req)
 
 	resp, err := f.opts.HTTPClient.Do(req)
 	if err != nil {

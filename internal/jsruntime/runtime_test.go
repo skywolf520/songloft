@@ -269,3 +269,130 @@ func TestExecuteJS_CtxAlreadyCanceled(t *testing.T) {
 		t.Errorf("ExecuteJS took %v with pre-canceled ctx; expected near-instant", elapsed)
 	}
 }
+
+// --- URL Polyfill 测试 ---
+
+func TestURLPolyfill_AbsoluteURL(t *testing.T) {
+	manager := NewJSEnvManager()
+	defer manager.SignalShutdown()
+
+	envID := "test-url-absolute"
+	code := polyfillJS + `
+		var u = new URL('https://example.com:8080/path/to?q=1#frag');
+		var result = JSON.stringify({
+			protocol: u.protocol,
+			host: u.host,
+			hostname: u.hostname,
+			port: u.port,
+			pathname: u.pathname,
+			search: u.search,
+			hash: u.hash,
+			origin: u.origin
+		});
+	`
+	if err := manager.CreateEnv(envID, code, 1); err != nil {
+		t.Fatalf("CreateEnv failed: %v", err)
+	}
+	defer manager.DestroyEnv(envID)
+
+	res, err := manager.ExecuteJS(context.Background(), envID, "result", 1000)
+	if err != nil {
+		t.Fatalf("ExecuteJS failed: %v", err)
+	}
+
+	expected := `{"protocol":"https:","host":"example.com:8080","hostname":"example.com","port":"8080","pathname":"/path/to","search":"?q=1","hash":"#frag","origin":"https://example.com:8080"}`
+	if res.Result != expected {
+		t.Errorf("got %s\nwant %s", res.Result, expected)
+	}
+}
+
+func TestURLPolyfill_RelativeWithBase(t *testing.T) {
+	manager := NewJSEnvManager()
+	defer manager.SignalShutdown()
+
+	envID := "test-url-relative-base"
+	code := polyfillJS + `
+		var u1 = new URL('/path', 'https://example.com/dir/file');
+		var u2 = new URL('sub', 'https://example.com/dir/');
+		var r1 = u1.href;
+		var r2 = u2.href;
+	`
+	if err := manager.CreateEnv(envID, code, 1); err != nil {
+		t.Fatalf("CreateEnv failed: %v", err)
+	}
+	defer manager.DestroyEnv(envID)
+
+	res1, _ := manager.ExecuteJS(context.Background(), envID, "r1", 1000)
+	if res1.Result != "https://example.com/dir/path" {
+		t.Errorf("relative with base '/path': got %s", res1.Result)
+	}
+
+	res2, _ := manager.ExecuteJS(context.Background(), envID, "r2", 1000)
+	if res2.Result != "https://example.com/dir//sub" {
+		t.Errorf("relative with base 'sub': got %s", res2.Result)
+	}
+}
+
+func TestURLPolyfill_RelativeWithoutBase_ThrowsTypeError(t *testing.T) {
+	manager := NewJSEnvManager()
+	defer manager.SignalShutdown()
+
+	envID := "test-url-relative-throws"
+	code := polyfillJS + `
+		var caught = false;
+		var errorName = '';
+		try {
+			new URL('/relative/path');
+		} catch(e) {
+			caught = true;
+			errorName = e.constructor.name || '';
+		}
+	`
+	if err := manager.CreateEnv(envID, code, 1); err != nil {
+		t.Fatalf("CreateEnv failed: %v", err)
+	}
+	defer manager.DestroyEnv(envID)
+
+	res, _ := manager.ExecuteJS(context.Background(), envID, "caught", 1000)
+	if res.Result != "true" {
+		t.Error("new URL('/relative/path') should throw, but did not")
+	}
+
+	res2, _ := manager.ExecuteJS(context.Background(), envID, "errorName", 1000)
+	if res2.Result != "TypeError" {
+		t.Errorf("expected TypeError, got %s", res2.Result)
+	}
+}
+
+func TestURLPolyfill_TryCatchDetectionPattern(t *testing.T) {
+	manager := NewJSEnvManager()
+	defer manager.SignalShutdown()
+
+	envID := "test-url-trycatch-pattern"
+	code := polyfillJS + `
+		function isAbsoluteURL(path) {
+			try { new URL(path); return true; }
+			catch(e) { return false; }
+		}
+		var absResult = isAbsoluteURL('https://example.com/file.mp3');
+		var relResult = isAbsoluteURL('/music/file.mp3');
+		var bareResult = isAbsoluteURL('file.mp3');
+	`
+	if err := manager.CreateEnv(envID, code, 1); err != nil {
+		t.Fatalf("CreateEnv failed: %v", err)
+	}
+	defer manager.DestroyEnv(envID)
+
+	res1, _ := manager.ExecuteJS(context.Background(), envID, "absResult", 1000)
+	if res1.Result != "true" {
+		t.Error("absolute URL should return true")
+	}
+	res2, _ := manager.ExecuteJS(context.Background(), envID, "relResult", 1000)
+	if res2.Result != "false" {
+		t.Error("relative path should return false")
+	}
+	res3, _ := manager.ExecuteJS(context.Background(), envID, "bareResult", 1000)
+	if res3.Result != "false" {
+		t.Error("bare filename should return false")
+	}
+}

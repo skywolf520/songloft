@@ -16,6 +16,7 @@ import (
 	"sync"
 	"time"
 
+	"songloft/internal/httputil"
 	"songloft/internal/models"
 	"songloft/internal/services/source"
 )
@@ -357,6 +358,7 @@ func (c *CacheService) downloadExternalToTemp(ctx context.Context, url string) (
 		return "", "", fmt.Errorf("new request: %w", err)
 	}
 	req.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
+	httputil.ApplyBasicAuthFromURL(req)
 	resp, err := c.downloadClient.Do(req)
 	if err != nil {
 		return "", "", fmt.Errorf("http get: %w", err)

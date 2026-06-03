@@ -18,6 +18,7 @@ import (
 	"unicode/utf8"
 
 	"songloft/internal/database"
+	"songloft/internal/httputil"
 	"songloft/internal/models"
 	"songloft/internal/services/source"
 )
@@ -664,6 +665,7 @@ func (c *ConvertService) fetchToTemp(ctx context.Context, downloadURL string) (s
 		return "", "", fmt.Errorf("create request: %w", err)
 	}
 	req.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
+	httputil.ApplyBasicAuthFromURL(req)
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
@@ -723,6 +725,7 @@ func (c *ConvertService) fetchAndSaveCover(ctx context.Context, coverURL string)
 		return "", fmt.Errorf("create request: %w", err)
 	}
 	req.Header.Set("Accept", "image/*")
+	httputil.ApplyBasicAuthFromURL(req)
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {

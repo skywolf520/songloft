@@ -427,6 +427,9 @@ globalThis.URL = function(url, base) {
         if (url.charAt(0)==='/') url = base.replace(/\/[^\/]*$/, '') + url;
         else if (!/^https?:\/\//.test(url)) url = base + '/' + url;
     }
+    if (!/^https?:\/\//.test(url)) {
+        throw new TypeError("Invalid URL: '" + url + "'");
+    }
     var m = url.match(/^(https?:)\/\/([^\/\?#]+)(\/[^?#]*)?(\?[^#]*)?(#.*)?$/);
     this.href = url;
     this.protocol = m ? m[1] : '';

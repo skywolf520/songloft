@@ -15,6 +15,7 @@ import (
 	"strconv"
 	"strings"
 
+	"songloft/internal/httputil"
 	"songloft/internal/models"
 	"songloft/internal/services"
 
@@ -598,6 +599,7 @@ func (h *HLSHandler) serveSegment(w http.ResponseWriter, r *http.Request, song *
 	if rangeHeader := r.Header.Get("Range"); rangeHeader != "" {
 		req.Header.Set("Range", rangeHeader)
 	}
+	httputil.ApplyBasicAuthFromURL(req)
 
 	resp, err := h.client.Do(req)
 	if err != nil {
@@ -686,6 +688,7 @@ func buildUpstreamRequest(ctx context.Context, upstreamURL string, songOrigin *u
 	if rangeHeader != "" {
 		req.Header.Set("Range", rangeHeader)
 	}
+	httputil.ApplyBasicAuthFromURL(req)
 	return req, nil
 }
 

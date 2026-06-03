@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"time"
 
+	"songloft/internal/httputil"
 	"songloft/internal/models"
 )
 
@@ -46,6 +47,7 @@ func (f *LyricFetcher) Fetch(ctx context.Context, lyricURL string) (models.Lyric
 		return models.LyricPayload{}, fmt.Errorf("create request: %w", err)
 	}
 	req.Header.Set("Accept", "application/json")
+	httputil.ApplyBasicAuthFromURL(req)
 
 	resp, err := f.httpClient.Do(req)
 	if err != nil {

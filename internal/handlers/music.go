@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"songloft/internal/database"
+	"songloft/internal/httputil"
 	"songloft/internal/models"
 	"songloft/internal/services"
 	"songloft/internal/services/playactivity"
@@ -869,6 +870,7 @@ func (h *SongHandler) serveRadio(w http.ResponseWriter, r *http.Request, song *m
 	if accept := r.Header.Get("Accept"); accept != "" {
 		upstreamReq.Header.Set("Accept", accept)
 	}
+	httputil.ApplyBasicAuthFromURL(upstreamReq)
 
 	client := &http.Client{
 		CheckRedirect: func(req *http.Request, via []*http.Request) error {

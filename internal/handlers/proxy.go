@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"songloft/internal/httputil"
 	"songloft/internal/services"
 )
 
@@ -135,6 +136,7 @@ func ServeRemoteResource(w http.ResponseWriter, r *http.Request, resourceURL str
 	if accept := r.Header.Get("Accept"); accept != "" {
 		upstreamReq.Header.Set("Accept", accept)
 	}
+	httputil.ApplyBasicAuthFromURL(upstreamReq)
 
 	// 发起请求
 	client := &http.Client{

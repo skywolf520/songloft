@@ -776,7 +776,7 @@ func (s *SongService) CleanInvalidSongs(ctx context.Context) (*CleanResult, erro
 //     回写传完整 song（pkg/tag.WriteTag 是重建模式，避免清空 Title/Artist 等其它字段）。
 //
 // 返回值：
-//   - status 表示文件回写结果（written/skipped/failed）；DB 已写入成功才会有值
+//   - status 表示文件回写结果（written/unchanged/failed）；DB 已写入成功才会有值
 //   - err 仅在 DB 操作失败时非 nil（文件回写失败不算失败，会通过 status 表达）
 //
 // lyric 应为 LyricPayload JSON 文本（或空）；lyricRemoteURL 仅在 lyricSource="url" 时使用。
@@ -787,7 +787,7 @@ func (s *SongService) UpdateLyrics(ctx context.Context, id int64, lyric, lyricSo
 
 	// url 来源不需要回写：歌词在运行时拉取，不缓存到本地文件
 	if lyricSource == models.LyricSourceURL {
-		return FileWriteSkipped, nil
+		return FileWriteUnchanged, nil
 	}
 
 	// 只对 type=local 且有 file_path 的歌曲尝试回写
@@ -795,10 +795,10 @@ func (s *SongService) UpdateLyrics(ctx context.Context, id int64, lyric, lyricSo
 	if err != nil || song == nil {
 		// DB 已写成功，但读不到 song（极小概率），跳过文件回写不报错
 		slog.Warn("UpdateLyrics: refetch song after lyric update failed", "songId", id, "err", err)
-		return FileWriteSkipped, nil
+		return FileWriteUnchanged, nil
 	}
 	if song.Type != models.TypeLocal || song.FilePath == "" {
-		return FileWriteSkipped, nil
+		return FileWriteUnchanged, nil
 	}
 
 	return WriteSongTags(song.FilePath, song), nil

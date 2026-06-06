@@ -21,11 +21,11 @@ type FileWriteStatus string
 const (
 	// FileWriteWritten 文件回写成功。
 	FileWriteWritten FileWriteStatus = "written"
-	// FileWriteSkipped 因前置条件不满足而未尝试回写：
+	// FileWriteUnchanged 因前置条件不满足而未尝试回写（文件未变更）：
 	//   - 不是本地歌曲 / file_path 为空
 	//   - lyric_source = url（运行时拉取，不缓存到本地文件）
 	//   - 文件扩展名不在 pkg/tag 支持的写入清单（pkg/tag 返回 ErrUnsupportedWrite）
-	FileWriteSkipped FileWriteStatus = "skipped"
+	FileWriteUnchanged FileWriteStatus = "unchanged"
 	// FileWriteFailed 实际写入时报错（IO / 解析失败等）。
 	FileWriteFailed FileWriteStatus = "failed"
 )
@@ -42,7 +42,7 @@ const (
 // 失败处理：仅返回状态码，不返回 error。失败/跳过都会打 log。
 func WriteSongTags(filePath string, song *models.Song) FileWriteStatus {
 	if filePath == "" || song == nil {
-		return FileWriteSkipped
+		return FileWriteUnchanged
 	}
 
 	// song.Lyric 是 LyricPayload JSON；tag 只能写纯 LRC 文本，取主歌词字段
@@ -86,7 +86,7 @@ func WriteSongTags(filePath string, song *models.Song) FileWriteStatus {
 		if errors.Is(err, tag.ErrUnsupportedWrite) {
 			slog.Debug("tag write skipped for unsupported format",
 				"path", filePath, "error", err)
-			return FileWriteSkipped
+			return FileWriteUnchanged
 		}
 		slog.Warn("write tag failed", "path", filePath, "error", err)
 		return FileWriteFailed

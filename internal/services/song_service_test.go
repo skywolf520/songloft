@@ -573,8 +573,8 @@ func TestUpdateLyrics_RemoteSong_SkipsFile(t *testing.T) {
 	if err != nil {
 		t.Fatalf("UpdateLyrics() error = %v", err)
 	}
-	if status != FileWriteSkipped {
-		t.Errorf("UpdateLyrics() status = %v, want %v", status, FileWriteSkipped)
+	if status != FileWriteUnchanged {
+		t.Errorf("UpdateLyrics() status = %v, want %v", status, FileWriteUnchanged)
 	}
 
 	got, err := repo.GetByID(ctx, song.ID)
@@ -609,8 +609,8 @@ func TestUpdateLyrics_URLSource_SkipsFile(t *testing.T) {
 	if err != nil {
 		t.Fatalf("UpdateLyrics() error = %v", err)
 	}
-	if status != FileWriteSkipped {
-		t.Errorf("UpdateLyrics() status = %v, want %v", status, FileWriteSkipped)
+	if status != FileWriteUnchanged {
+		t.Errorf("UpdateLyrics() status = %v, want %v", status, FileWriteUnchanged)
 	}
 
 	got, _ := repo.GetByID(ctx, song.ID)

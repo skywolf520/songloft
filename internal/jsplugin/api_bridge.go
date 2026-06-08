@@ -429,8 +429,9 @@ func (h *BridgeHandler) handleSongs(action, data string) (string, error) {
 	switch action {
 	case "songs.list":
 		var req struct {
-			Limit  int `json:"limit"`
-			Offset int `json:"offset"`
+			PathPrefix string `json:"pathPrefix"`
+			Limit      int    `json:"limit"`
+			Offset     int    `json:"offset"`
 		}
 		if data != "" {
 			_ = json.Unmarshal([]byte(data), &req)
@@ -439,8 +440,9 @@ func (h *BridgeHandler) handleSongs(action, data string) (string, error) {
 			req.Limit = 20
 		}
 		filter := &database.SongFilter{
-			Limit:  req.Limit,
-			Offset: req.Offset,
+			PathPrefix: req.PathPrefix,
+			Limit:      req.Limit,
+			Offset:     req.Offset,
 		}
 		songs, err := h.db.SongRepository().List(ctx, filter)
 		if err != nil {

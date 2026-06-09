@@ -130,6 +130,7 @@ func (pm *PackageManager) InstallFromUpload(zipData []byte) (*JSPlugin, bool, er
 		MinHostVersion: manifest.MinHostVersion,
 		Permissions:    manifest.Permissions,
 		PublicPaths:    manifest.PublicPaths,
+		Icon:           manifest.Icon,
 		UpdateURL:      manifest.UpdateURL,
 		DownloadURL:    manifest.DownloadURL,
 		Status:         JSPluginStatusInactive,
@@ -242,6 +243,7 @@ func (pm *PackageManager) Update(pluginID int64, zipData []byte) (*JSPlugin, err
 	existing.MinHostVersion = manifest.MinHostVersion
 	existing.Permissions = manifest.Permissions
 	existing.PublicPaths = manifest.PublicPaths
+	existing.Icon = manifest.Icon
 	existing.UpdateURL = manifest.UpdateURL
 	existing.DownloadURL = manifest.DownloadURL
 	existing.ZipHash = zipHash
@@ -351,6 +353,8 @@ func (pm *PackageManager) SyncPluginsFromDirectory() ([]*JSPlugin, error) {
 				}
 				result = append(result, updated)
 			} else {
+				// Hash 一致但 manifest 元数据（如 icon）可能变化（zipHash 排除 plugin.json）
+				pm.syncManifestMetadata(ctx, existing, zipData)
 				result = append(result, existing)
 			}
 			// 从 map 中移除已处理的
@@ -380,6 +384,43 @@ func (pm *PackageManager) SyncPluginsFromDirectory() ([]*JSPlugin, error) {
 	}
 
 	return result, nil
+}
+
+// syncManifestMetadata 在 zipHash 匹配时比对 plugin.json 元数据字段，有变化则更新 DB。
+// zipHash 排除 plugin.json，因此仅改 manifest（如新增 icon）不会触发 Update，需此方法补偿。
+func (pm *PackageManager) syncManifestMetadata(ctx context.Context, existing *JSPlugin, zipData []byte) {
+	manifest, err := readPluginManifestFromZip(zipData)
+	if err != nil {
+		return
+	}
+	dirty := false
+	if existing.Icon != manifest.Icon {
+		existing.Icon = manifest.Icon
+		dirty = true
+	}
+	if existing.Name != manifest.Name {
+		existing.Name = manifest.Name
+		dirty = true
+	}
+	if existing.Description != manifest.Description {
+		existing.Description = manifest.Description
+		dirty = true
+	}
+	if existing.Homepage != manifest.Homepage {
+		existing.Homepage = manifest.Homepage
+		dirty = true
+	}
+	if existing.UpdateURL != manifest.UpdateURL {
+		existing.UpdateURL = manifest.UpdateURL
+		dirty = true
+	}
+	if dirty {
+		if err := pm.repo.Update(ctx, existing); err != nil {
+			slog.Warn("sync manifest metadata failed", "entryPath", existing.EntryPath, "error", err)
+		} else {
+			slog.Info("synced manifest metadata", "entryPath", existing.EntryPath)
+		}
+	}
 }
 
 // applyProxy 将代理前缀应用到 URL 上，与 handlers.applyGithubProxy 行为一致。

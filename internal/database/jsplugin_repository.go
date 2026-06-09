@@ -87,6 +87,7 @@ func (r *JSPluginRepository) Create(ctx context.Context, plugin *models.JSPlugin
 		FileModTime:    plugin.FileModTime,
 		FilePath:       plugin.FilePath,
 		PublicPaths:    string(publicPathsJSON),
+		Icon:           plugin.Icon,
 	})
 	if err != nil {
 		return fmt.Errorf("insert js_plugin: %w", err)
@@ -124,6 +125,7 @@ func (r *JSPluginRepository) Update(ctx context.Context, plugin *models.JSPlugin
 		FileModTime:    plugin.FileModTime,
 		FilePath:       plugin.FilePath,
 		PublicPaths:    string(publicPathsJSON),
+		Icon:           plugin.Icon,
 		ID:             plugin.ID,
 	}); err != nil {
 		return fmt.Errorf("update js_plugin %d: %w", plugin.ID, err)
@@ -183,6 +185,7 @@ func jsPluginRowToModel(row sqlc.JsPlugin) *models.JSPlugin {
 		EntryHash:      row.EntryHash,
 		FileModTime:    row.FileModTime,
 		FilePath:       row.FilePath,
+		Icon:           row.Icon,
 		CreatedAt:      row.CreatedAt,
 		UpdatedAt:      row.UpdatedAt,
 	}

@@ -213,6 +213,12 @@ func (s *RegistryService) resolvePluginJSON(ctx context.Context, url string, git
 		MinHostVersion: manifest.MinHostVersion,
 	}
 
+	if manifest.Icon != "" {
+		if lastSlash := strings.LastIndex(url, "/"); lastSlash >= 0 {
+			entry.Icon = url[:lastSlash+1] + "static/" + manifest.Icon
+		}
+	}
+
 	// plugin.json 中 download_url 通常为空，通过 updateUrl 指向的 manifest.json 获取
 	if entry.DownloadURL == "" && entry.UpdateURL != "" {
 		updateRequestURL := applyProxy(entry.UpdateURL, githubProxy)

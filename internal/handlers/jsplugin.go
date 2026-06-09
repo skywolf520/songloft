@@ -119,9 +119,26 @@ func (h *JSPluginHandler) handleList(w http.ResponseWriter, r *http.Request) {
 		plugins = []*models.JSPlugin{}
 	}
 
+	for _, p := range plugins {
+		h.resolvePluginIcon(p)
+	}
+
 	respondJSON(w, http.StatusOK, map[string]interface{}{
 		"plugins": plugins,
 	})
+}
+
+// resolvePluginIcon 将插件的 icon 字段解析为实际存在的文件名。
+// 处理两种情况：manifest 声明了 icon 但文件名带 hash、manifest 未声明 icon 但文件存在。
+func (h *JSPluginHandler) resolvePluginIcon(p *models.JSPlugin) {
+	if p.Icon != "" {
+		resolved := h.manager.ResolvePluginIcon(p.EntryPath, p.Icon)
+		if resolved != "" {
+			p.Icon = resolved
+			return
+		}
+	}
+	p.Icon = h.manager.DetectPluginIcon(p.EntryPath)
 }
 
 // handleUpload 上传安装新插件
@@ -239,6 +256,8 @@ func (h *JSPluginHandler) handleGet(w http.ResponseWriter, r *http.Request) {
 		respondError(w, http.StatusNotFound, "插件不存在", err)
 		return
 	}
+
+	h.resolvePluginIcon(plugin)
 
 	respondJSON(w, http.StatusOK, map[string]interface{}{
 		"plugin": plugin,

@@ -50,6 +50,7 @@ type JsPlugin struct {
 	CreatedAt      time.Time
 	UpdatedAt      time.Time
 	PublicPaths    string
+	Icon           string
 }
 
 type Playlist struct {

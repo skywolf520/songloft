@@ -1009,6 +1009,199 @@
                 }
             }
         },
+        "/jsplugin/{entryPath}/files/{path}": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "通过 Go 原生 http.ServeFile 直接返回插件可访问范围内的文件，支持 Range 请求和 HTTP 缓存。",
+                "produces": [
+                    "application/octet-stream"
+                ],
+                "tags": [
+                    "JS 插件"
+                ],
+                "summary": "插件文件直接访问",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "插件入口标识",
+                        "name": "entryPath",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "文件路径",
+                        "name": "path",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "文件内容",
+                        "schema": {
+                            "type": "file"
+                        }
+                    },
+                    "206": {
+                        "description": "部分文件内容（Range 请求）",
+                        "schema": {
+                            "type": "file"
+                        }
+                    },
+                    "404": {
+                        "description": "文件不存在或权限不足",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                }
+            },
+            "head": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "通过 Go 原生 http.ServeFile 直接返回插件可访问范围内的文件，支持 Range 请求和 HTTP 缓存。",
+                "produces": [
+                    "application/octet-stream"
+                ],
+                "tags": [
+                    "JS 插件"
+                ],
+                "summary": "插件文件直接访问",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "插件入口标识",
+                        "name": "entryPath",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "文件路径",
+                        "name": "path",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "文件内容",
+                        "schema": {
+                            "type": "file"
+                        }
+                    },
+                    "206": {
+                        "description": "部分文件内容（Range 请求）",
+                        "schema": {
+                            "type": "file"
+                        }
+                    },
+                    "404": {
+                        "description": "文件不存在或权限不足",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                }
+            }
+        },
+        "/jsplugin/{entryPath}/settings/external-paths": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "返回管理员为该插件配置的可访问外部目录列表（需 fs:external 权限）。",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "JS 插件"
+                ],
+                "summary": "获取插件外部目录配置",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "插件入口标识",
+                        "name": "entryPath",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "{\"paths\":[]}",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    }
+                }
+            },
+            "put": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "管理员配置该插件可访问的外部目录列表。目录必须存在且为绝对路径。",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "JS 插件"
+                ],
+                "summary": "设置插件外部目录配置",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "插件入口标识",
+                        "name": "entryPath",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "{",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "type": "object"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "{\"paths\":[]}",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "400": {
+                        "description": "参数错误",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            }
+        },
         "/jsplugin/{entryPath}/static": {
             "get": {
                 "description": "服务 static/index.html，是 handlePluginStatic 的「带 /static 后缀」变体。无需认证。",
@@ -6141,6 +6334,9 @@
                 "homepage": {
                     "type": "string"
                 },
+                "icon": {
+                    "type": "string"
+                },
                 "id": {
                     "type": "integer"
                 },
@@ -6159,6 +6355,13 @@
                 },
                 "permissions": {
                     "description": "权限列表",
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "public_paths": {
+                    "description": "无需 JWT 认证的路径前缀",
                     "type": "array",
                     "items": {
                         "type": "string"

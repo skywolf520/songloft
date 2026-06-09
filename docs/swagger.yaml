@@ -266,6 +266,8 @@ definitions:
         type: string
       homepage:
         type: string
+      icon:
+        type: string
       id:
         type: integer
       license:
@@ -279,6 +281,11 @@ definitions:
         type: string
       permissions:
         description: 权限列表
+        items:
+          type: string
+        type: array
+      public_paths:
+        description: 无需 JWT 认证的路径前缀
         items:
           type: string
         type: array
@@ -1821,6 +1828,130 @@ paths:
       security:
       - BearerAuth: []
       summary: 插件 API 转发 catch-all（动态路由）
+      tags:
+      - JS 插件
+  /jsplugin/{entryPath}/files/{path}:
+    get:
+      description: 通过 Go 原生 http.ServeFile 直接返回插件可访问范围内的文件，支持 Range 请求和 HTTP 缓存。
+      parameters:
+      - description: 插件入口标识
+        in: path
+        name: entryPath
+        required: true
+        type: string
+      - description: 文件路径
+        in: path
+        name: path
+        required: true
+        type: string
+      produces:
+      - application/octet-stream
+      responses:
+        "200":
+          description: 文件内容
+          schema:
+            type: file
+        "206":
+          description: 部分文件内容（Range 请求）
+          schema:
+            type: file
+        "404":
+          description: 文件不存在或权限不足
+          schema:
+            type: string
+      security:
+      - BearerAuth: []
+      summary: 插件文件直接访问
+      tags:
+      - JS 插件
+    head:
+      description: 通过 Go 原生 http.ServeFile 直接返回插件可访问范围内的文件，支持 Range 请求和 HTTP 缓存。
+      parameters:
+      - description: 插件入口标识
+        in: path
+        name: entryPath
+        required: true
+        type: string
+      - description: 文件路径
+        in: path
+        name: path
+        required: true
+        type: string
+      produces:
+      - application/octet-stream
+      responses:
+        "200":
+          description: 文件内容
+          schema:
+            type: file
+        "206":
+          description: 部分文件内容（Range 请求）
+          schema:
+            type: file
+        "404":
+          description: 文件不存在或权限不足
+          schema:
+            type: string
+      security:
+      - BearerAuth: []
+      summary: 插件文件直接访问
+      tags:
+      - JS 插件
+  /jsplugin/{entryPath}/settings/external-paths:
+    get:
+      description: 返回管理员为该插件配置的可访问外部目录列表（需 fs:external 权限）。
+      parameters:
+      - description: 插件入口标识
+        in: path
+        name: entryPath
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: '{"paths":[]}'
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: 获取插件外部目录配置
+      tags:
+      - JS 插件
+    put:
+      consumes:
+      - application/json
+      description: 管理员配置该插件可访问的外部目录列表。目录必须存在且为绝对路径。
+      parameters:
+      - description: 插件入口标识
+        in: path
+        name: entryPath
+        required: true
+        type: string
+      - description: '{'
+        in: body
+        name: request
+        required: true
+        schema:
+          type: object
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: '{"paths":[]}'
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: 参数错误
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: 设置插件外部目录配置
       tags:
       - JS 插件
   /jsplugin/{entryPath}/static:

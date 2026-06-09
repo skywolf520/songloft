@@ -8,6 +8,7 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 	"time"
 
@@ -73,6 +74,46 @@ func NewManager(repo Repository, pluginsDir, pluginsDataDir, basePath string, ro
 // Packager 返回内部的 PackageManager（供 handlers 复用，避免重复构造）
 func (m *Manager) Packager() *PackageManager {
 	return m.packager
+}
+
+// DetectPluginIcon 检测插件 static 目录中的图标文件。
+// 支持精确匹配和带 content hash 指纹的文件名（如 icon.svg → icon.abc123.svg）。
+func (m *Manager) DetectPluginIcon(entryPath string) string {
+	return detectIconInDir(filepath.Join(m.pluginsDataDir, entryPath, "static"))
+}
+
+// ResolvePluginIcon 将 manifest 中声明的 icon 文件名解析为实际磁盘上的文件名。
+// 插件构建工具会给静态文件加 content hash 指纹（icon.svg → icon.abc123.svg），
+// 此方法匹配带指纹的真实文件名。若精确匹配或 glob 匹配不到则返回空串。
+func (m *Manager) ResolvePluginIcon(entryPath, declaredIcon string) string {
+	staticDir := filepath.Join(m.pluginsDataDir, entryPath, "static")
+	target := filepath.Join(staticDir, declaredIcon)
+	if _, err := os.Stat(target); err == nil {
+		return declaredIcon
+	}
+	ext := filepath.Ext(declaredIcon)
+	base := strings.TrimSuffix(declaredIcon, ext)
+	pattern := filepath.Join(staticDir, base+".*"+ext)
+	matches, err := filepath.Glob(pattern)
+	if err == nil && len(matches) > 0 {
+		return filepath.Base(matches[0])
+	}
+	return ""
+}
+
+func detectIconInDir(dir string) string {
+	for _, ext := range []string{".svg", ".png", ".webp"} {
+		pattern := filepath.Join(dir, "icon"+ext)
+		if _, err := os.Stat(pattern); err == nil {
+			return "icon" + ext
+		}
+		globPattern := filepath.Join(dir, "icon.*"+ext)
+		matches, _ := filepath.Glob(globPattern)
+		if len(matches) > 0 {
+			return filepath.Base(matches[0])
+		}
+	}
+	return ""
 }
 
 // SetAuthService 设置认证服务和端口，并生成插件专用的永久 JWT Token（参考 WASM 插件的做法，启动时只生成一次）

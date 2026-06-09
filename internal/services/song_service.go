@@ -307,8 +307,8 @@ type scanExtractResult struct {
 }
 
 const (
-	metadataWorkers        = 4             // 并发元数据提取worker数量
-	dbBatchSize            = 50            // 数据库批量提交大小
+	metadataWorkers        = 4                // 并发元数据提取worker数量
+	dbBatchSize            = 50               // 数据库批量提交大小
 	fileStabilityThreshold = 10 * time.Second // 文件修改时间距今小于此值视为正在写入
 )
 
@@ -378,7 +378,11 @@ func (s *SongService) doScanAndImport(ctx context.Context, reimport bool) {
 	}
 
 	if len(toProcess) == 0 {
-		s.runAutoCreatePlaylists(ctx)
+		if s.configService != nil && s.configService.GetBool("scan_auto_create_playlists", true) {
+			s.runAutoCreatePlaylists(ctx)
+		} else {
+			slog.Info("auto-create playlists disabled, skipping")
+		}
 		s.scanProgressManager.Complete()
 		s.runAutoFingerprint()
 		return
@@ -483,7 +487,11 @@ func (s *SongService) doScanAndImport(ctx context.Context, reimport bool) {
 	default:
 	}
 
-	s.runAutoCreatePlaylists(ctx)
+	if s.configService != nil && s.configService.GetBool("scan_auto_create_playlists", true) {
+		s.runAutoCreatePlaylists(ctx)
+	} else {
+		slog.Info("auto-create playlists disabled, skipping")
+	}
 	s.scanProgressManager.Complete()
 	s.runAutoFingerprint()
 }

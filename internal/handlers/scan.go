@@ -201,10 +201,11 @@ func (h *ScanHandler) ListDirNames(w http.ResponseWriter, r *http.Request) {
 //   - 详见 AGENTS.md「配置接口规范」章节。
 
 const (
-	autoScanConfigKey              = "auto_scan"
-	musicPathConfigKey             = "music_path"
-	scanAutoCreateSubdirsConfigKey = "scan_auto_create_include_subdirs"
-	scanTitleSourceConfigKey       = "scan_title_source"
+	autoScanConfigKey                = "auto_scan"
+	musicPathConfigKey               = "music_path"
+	scanAutoCreateSubdirsConfigKey   = "scan_auto_create_include_subdirs"
+	scanAutoCreatePlaylistsConfigKey = "scan_auto_create_playlists"
+	scanTitleSourceConfigKey         = "scan_title_source"
 )
 
 // MusicPathSetting /settings/music-path 的请求与响应体。
@@ -330,6 +331,60 @@ func (h *ScanHandler) UpdateAutoCreateIncludeSubdirsSetting(w http.ResponseWrite
 		val = "true"
 	}
 	if err := h.configService.Set(scanAutoCreateSubdirsConfigKey, val); err != nil {
+		respondError(w, http.StatusInternalServerError, "保存配置失败", err)
+		return
+	}
+	respondJSON(w, http.StatusOK, map[string]bool{"enabled": req.Enabled})
+}
+
+// scanAutoCreatePlaylistsRequest /settings/scan-auto-create-playlists PUT 请求体
+type scanAutoCreatePlaylistsRequest struct {
+	Enabled bool `json:"enabled"`
+}
+
+// GetAutoCreatePlaylistsSetting GET /api/v1/settings/scan-auto-create-playlists
+// @Summary 获取「扫描后自动创建歌单」开关
+// @Description 控制扫描完成后是否根据音乐目录结构自动创建歌单。默认启用（true）。关闭后扫描仅入库歌曲，不再自动建歌单。
+// @Tags 扫描管理
+// @Produce json
+// @Success 200 {object} map[string]bool "返回 enabled 字段"
+// @Security BearerAuth
+// @Router /settings/scan-auto-create-playlists [get]
+func (h *ScanHandler) GetAutoCreatePlaylistsSetting(w http.ResponseWriter, r *http.Request) {
+	enabled := true
+	if h.configService != nil {
+		enabled = h.configService.GetBool(scanAutoCreatePlaylistsConfigKey, true)
+	}
+	respondJSON(w, http.StatusOK, map[string]bool{"enabled": enabled})
+}
+
+// UpdateAutoCreatePlaylistsSetting PUT /api/v1/settings/scan-auto-create-playlists
+// @Summary 更新「扫描后自动创建歌单」开关
+// @Description 控制扫描完成后是否根据音乐目录结构自动创建歌单。
+// @Tags 扫描管理
+// @Accept json
+// @Produce json
+// @Param request body scanAutoCreatePlaylistsRequest true "开关请求"
+// @Success 200 {object} map[string]bool "返回 enabled 字段"
+// @Failure 400 {object} map[string]string "请求格式错误"
+// @Failure 500 {object} map[string]string "保存配置失败"
+// @Security BearerAuth
+// @Router /settings/scan-auto-create-playlists [put]
+func (h *ScanHandler) UpdateAutoCreatePlaylistsSetting(w http.ResponseWriter, r *http.Request) {
+	if h.configService == nil {
+		respondError(w, http.StatusInternalServerError, "configService 未注入", nil)
+		return
+	}
+	var req scanAutoCreatePlaylistsRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		respondError(w, http.StatusBadRequest, "请求格式错误", err)
+		return
+	}
+	val := "false"
+	if req.Enabled {
+		val = "true"
+	}
+	if err := h.configService.Set(scanAutoCreatePlaylistsConfigKey, val); err != nil {
 		respondError(w, http.StatusInternalServerError, "保存配置失败", err)
 		return
 	}

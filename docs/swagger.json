@@ -4385,6 +4385,92 @@
                 }
             }
         },
+        "/settings/scan-auto-create-playlists": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "控制扫描完成后是否根据音乐目录结构自动创建歌单。默认启用（true）。关闭后扫描仅入库歌曲，不再自动建歌单。",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "扫描管理"
+                ],
+                "summary": "获取「扫描后自动创建歌单」开关",
+                "responses": {
+                    "200": {
+                        "description": "返回 enabled 字段",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "boolean"
+                            }
+                        }
+                    }
+                }
+            },
+            "put": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "控制扫描完成后是否根据音乐目录结构自动创建歌单。",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "扫描管理"
+                ],
+                "summary": "更新「扫描后自动创建歌单」开关",
+                "parameters": [
+                    {
+                        "description": "开关请求",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/handlers.scanAutoCreatePlaylistsRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "返回 enabled 字段",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "boolean"
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "请求格式错误",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "保存配置失败",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            }
+        },
         "/settings/scan-title-source": {
             "get": {
                 "security": [
@@ -6252,6 +6338,14 @@
                     "items": {
                         "type": "string"
                     }
+                }
+            }
+        },
+        "handlers.scanAutoCreatePlaylistsRequest": {
+            "type": "object",
+            "properties": {
+                "enabled": {
+                    "type": "boolean"
                 }
             }
         },

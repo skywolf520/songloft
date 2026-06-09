@@ -527,8 +527,8 @@ type JSPlugin struct {
 	EntryPath      string         `json:"entry_path"` // 路由前缀（如 "myplugin"）
 	Main           string         `json:"main"`       // 入口文件路径（如 "main.js"）
 	MinHostVersion string         `json:"min_host_version,omitempty"`
-	Permissions    []string       `json:"permissions"`    // 权限列表
-	PublicPaths    []string       `json:"public_paths"`   // 无需 JWT 认证的路径前缀
+	Permissions    []string       `json:"permissions"`  // 权限列表
+	PublicPaths    []string       `json:"public_paths"` // 无需 JWT 认证的路径前缀
 	Icon           string         `json:"icon,omitempty"`
 	UpdateURL      string         `json:"update_url,omitempty"`
 	DownloadURL    string         `json:"download_url,omitempty"`

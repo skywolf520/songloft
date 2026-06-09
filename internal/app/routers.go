@@ -165,6 +165,8 @@ func (a *App) setupAPIV1Router() {
 			r.Put("/settings/music-path", scanHandler.UpdateMusicPathSetting)
 			r.Get("/settings/scan-auto-create-include-subdirs", scanHandler.GetAutoCreateIncludeSubdirsSetting)
 			r.Put("/settings/scan-auto-create-include-subdirs", scanHandler.UpdateAutoCreateIncludeSubdirsSetting)
+			r.Get("/settings/scan-auto-create-playlists", scanHandler.GetAutoCreatePlaylistsSetting)
+			r.Put("/settings/scan-auto-create-playlists", scanHandler.UpdateAutoCreatePlaylistsSetting)
 			r.Get("/settings/scan-title-source", scanHandler.GetScanTitleSourceSetting)
 			r.Put("/settings/scan-title-source", scanHandler.UpdateScanTitleSourceSetting)
 			r.Get("/settings/auto-scan", scanHandler.GetAutoScanSetting)

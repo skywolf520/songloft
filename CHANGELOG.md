@@ -1,3 +1,40 @@
+## [v2.7.0] - 2026-06-09
+### :sparkles: New Features
+- [`9b3fb55`](https://github.com/songloft-org/songloft/commit/9b3fb55cd59e62f74eefefb1466e0634c549d147) - **jsplugin**: support pathPrefix param in songs.list bridge *(commit by [@hanxi](https://github.com/hanxi))*
+- [`59f8d0c`](https://github.com/songloft-org/songloft/commit/59f8d0c1cff80bc808b4550d354fbf292c471d10) - **song**: add ISRC field to Song model and extract from audio tags *(commit by [@hanxi](https://github.com/hanxi))*
+- [`4ccbc0c`](https://github.com/songloft-org/songloft/commit/4ccbc0ccb58eabcfc025c1e526e27794e320f9b4) - **scan**: add auto-scan with file stability detection *(commit by [@hanxi](https://github.com/hanxi))*
+- [`24f934d`](https://github.com/songloft-org/songloft/commit/24f934d5bb45995312c835f857d66a3f0bf51a45) - 核心镜像缺ALSA用户态运行文件 *(PR [#135](https://github.com/songloft-org/songloft/pull/135) by [@huaimi123](https://github.com/huaimi123))*
+- [`5b8d062`](https://github.com/songloft-org/songloft/commit/5b8d0621d0f3b6387492b69c2a336742092ab0fc) - **jsplugin**: add serveFile directive, file serve route, and publicPaths *(commit by [@hanxi](https://github.com/hanxi))*
+- [`139b667`](https://github.com/songloft-org/songloft/commit/139b667bcef8edf43ffe8c628580a11514e85d36) - **jsplugin**: add external-paths settings API *(commit by [@hanxi](https://github.com/hanxi))*
+- [`e7c365c`](https://github.com/songloft-org/songloft/commit/e7c365ca2de450ace76d3ee5da498617458e899b) - **subsonic**: add Subsonic server mode *(commit by [@hanxi](https://github.com/hanxi))*
+- [`b5ebe57`](https://github.com/songloft-org/songloft/commit/b5ebe572138212b2ab4047f482ca40993c951895) - **subsonic**: add server mode settings UI *(commit by [@hanxi](https://github.com/hanxi))*
+- [`afd326e`](https://github.com/songloft-org/songloft/commit/afd326ea3fdb00882c29c6957bebc5e0887a0acf) - **subsonic**: add getGenres endpoint *(commit by [@hanxi](https://github.com/hanxi))*
+- [`51eab49`](https://github.com/songloft-org/songloft/commit/51eab497becda990a1ab786ad9a7b0b242298e63) - **subsonic**: add getSong, getStarred, getIndexes endpoints *(commit by [@hanxi](https://github.com/hanxi))*
+- [`383b6c1`](https://github.com/songloft-org/songloft/commit/383b6c1a7f59c7d197f1af5d9bf5d1259920b151) - **subsonic**: getStarred reads from built-in favorites playlist *(commit by [@hanxi](https://github.com/hanxi))*
+- [`f3f9b85`](https://github.com/songloft-org/songloft/commit/f3f9b85083ba1e0f05527909a98ba4fa90d2d7a3) - **subsonic**: add copy button for server URL *(commit by [@hanxi](https://github.com/hanxi))*
+- [`fdddf45`](https://github.com/songloft-org/songloft/commit/fdddf45c0c4b6e4e536336cb3932cb4f65c33723) - **jsplugin**: add plugin icon support *(PR [#139](https://github.com/songloft-org/songloft/pull/139) by [@hanxi](https://github.com/hanxi))*
+
+### :bug: Bug Fixes
+- [`fc52d35`](https://github.com/songloft-org/songloft/commit/fc52d355163d1e28f9df799c77d1fdb5b7993a76) - **miot**: embed模式下搜索框被遮挡 *(commit by [@hanxi](https://github.com/hanxi))*
+- [`4e06ba5`](https://github.com/songloft-org/songloft/commit/4e06ba5e35b9af087a76404d64dad2bb206b4914) - **plugin-toolchain**: add fs:music, fs:external to builder permission whitelist *(commit by [@hanxi](https://github.com/hanxi))*
+- [`59e2f65`](https://github.com/songloft-org/songloft/commit/59e2f65668644a8d01743046cfecd2753dcf2baf) - **jsplugin**: publicPaths bypass via AuthMiddleware checker *(commit by [@hanxi](https://github.com/hanxi))*
+- [`1997a90`](https://github.com/songloft-org/songloft/commit/1997a900be041c22abfe41b34e356bbe230c3f18) - **subsonic**: server URL display should not include /rest suffix *(commit by [@hanxi](https://github.com/hanxi))*
+- [`48d4939`](https://github.com/songloft-org/songloft/commit/48d4939847c1bcdc25ae3110db931d2e3812cfac) - **subsonic**: fix field mapping and add getAlbum/getArtist endpoints *(commit by [@hanxi](https://github.com/hanxi))*
+- [`a927818`](https://github.com/songloft-org/songloft/commit/a927818006cb2f3356205094de347b9c3a3996e7) - **subsonic**: add required song fields for client compatibility *(commit by [@hanxi](https://github.com/hanxi))*
+- [`66a0114`](https://github.com/songloft-org/songloft/commit/66a0114bc5a741a4c1f4aab4d77068bb5e47d91c) - **subsonic**: fix cover art and add lyrics support *(commit by [@hanxi](https://github.com/hanxi))*
+- [`e26f71e`](https://github.com/songloft-org/songloft/commit/e26f71e690cc850245a6660386ba0f8473c6b049) - **subsonic**: playlist cover art display *(commit by [@hanxi](https://github.com/hanxi))*
+
+### :recycle: Refactors
+- [`d7a0d89`](https://github.com/songloft-org/songloft/commit/d7a0d8902af160535b7ea24c2349e29bb1680a92) - **jsplugin**: merge manifest.json into plugin.json *(commit by [@hanxi](https://github.com/hanxi))*
+
+### :memo: Documentation Changes
+- [`d5810c5`](https://github.com/songloft-org/songloft/commit/d5810c5cf6afbffd86e2cbf57923acafe6772daa) - update CHANGELOG for v2.6.4 *(commit by [@github-actions[bot]](https://github.com/apps/github-actions))*
+
+### :wrench: Chores
+- [`eda34ed`](https://github.com/songloft-org/songloft/commit/eda34eda75a703d6c5e842c6895de54a7bf5c43e) - **subsonic**: rename plugin title *(commit by [@hanxi](https://github.com/hanxi))*
+- [`59b7541`](https://github.com/songloft-org/songloft/commit/59b754127a7ccf5c5734133a2b5432a2b01d6841) - release version 2.7.0 *(commit by [@hanxi](https://github.com/hanxi))*
+
+
 ## [v2.6.4] - 2026-06-07
 ### :sparkles: New Features
 - [`27aeb03`](https://github.com/songloft-org/songloft/commit/27aeb035197f23454c3d6f39772dd6d13edf8871) - **jsplugin**: 支持插件强制更新（跳过版本检查） *(commit by [@hanxi](https://github.com/hanxi))*
@@ -1171,3 +1208,4 @@
 [v2.6.2]: https://github.com/songloft-org/songloft/compare/v2.6.1...v2.6.2
 [v2.6.3]: https://github.com/songloft-org/songloft/compare/v2.6.2...v2.6.3
 [v2.6.4]: https://github.com/songloft-org/songloft/compare/v2.6.3...v2.6.4
+[v2.7.0]: https://github.com/songloft-org/songloft/compare/v2.6.4...v2.7.0

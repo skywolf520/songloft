@@ -51,6 +51,7 @@ type JsPlugin struct {
 	UpdatedAt      time.Time
 	PublicPaths    string
 	Icon           string
+	ExternalPaths  string
 }
 
 type Playlist struct {

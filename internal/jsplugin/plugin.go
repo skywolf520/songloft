@@ -38,6 +38,7 @@ type PluginManifest struct {
 	MinHostVersion string   `json:"minHostVersion,omitempty"`
 	Permissions    []string `json:"permissions"`
 	PublicPaths    []string `json:"publicPaths,omitempty"`
+	ExternalPaths  []string `json:"externalPaths,omitempty"`
 	Icon           string   `json:"icon,omitempty"`
 	UpdateURL      string   `json:"updateUrl,omitempty"`
 	DownloadURL    string   `json:"download_url,omitempty"`

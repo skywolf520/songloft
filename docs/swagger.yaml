@@ -32,6 +32,27 @@ definitions:
       reimport:
         type: boolean
     type: object
+  handlers.WriteSongTagsRequest:
+    properties:
+      album:
+        type: string
+      artist:
+        type: string
+      clear_cover:
+        type: boolean
+      cover_data:
+        type: string
+      cover_url:
+        type: string
+      genre:
+        type: string
+      lyrics:
+        type: string
+      title:
+        type: string
+      year:
+        type: integer
+    type: object
   handlers.hlsProxySettingRequest:
     properties:
       enabled:
@@ -245,6 +266,11 @@ definitions:
       entry_path:
         description: 路由前缀（如 "myplugin"）
         type: string
+      external_paths:
+        description: 可访问的外部绝对路径目录
+        items:
+          type: string
+        type: array
       file_mod_time:
         type: string
       file_path:
@@ -898,46 +924,6 @@ definitions:
     - ScanStatusFailed
     - ScanStatusCancelling
     - ScanStatusCancelled
-  songloft_internal_handlers.WriteSongTagsRequest:
-    properties:
-      album:
-        type: string
-      artist:
-        type: string
-      clear_cover:
-        type: boolean
-      cover_data:
-        type: string
-      cover_url:
-        type: string
-      genre:
-        type: string
-      lyrics:
-        type: string
-      title:
-        type: string
-      year:
-        type: integer
-    type: object
-  songloft_jsplugins-src_songloft-plugin-tag_internal_handlers.WriteSongTagsRequest:
-    properties:
-      album:
-        type: string
-      artist:
-        type: string
-      cover_data:
-        type: string
-      cover_url:
-        type: string
-      genre:
-        type: string
-      lyrics:
-        type: string
-      title:
-        type: string
-      year:
-        type: integer
-    type: object
   source.HealthClass:
     enum:
     - green
@@ -1053,7 +1039,8 @@ paths:
     put:
       consumes:
       - application/json
-      description: 将元数据写入数据库和本地音频文件标签（仅本地歌曲）。cover_data(base64) 优先于 cover_url。非空字段覆盖，空值保留原值。
+      description: 将元数据写入数据库和本地音频文件标签（仅本地歌曲）。cover_data(base64) 优先于 cover_url。非空字段覆盖，空值保留原值。设置
+        clear_cover=true 可显式清空封面。
       parameters:
       - description: 歌曲ID
         in: path
@@ -1065,7 +1052,7 @@ paths:
         name: request
         required: true
         schema:
-          $ref: '#/definitions/songloft_jsplugins-src_songloft-plugin-tag_internal_handlers.WriteSongTagsRequest'
+          $ref: '#/definitions/handlers.WriteSongTagsRequest'
       produces:
       - application/json
       responses:
@@ -1921,63 +1908,6 @@ paths:
       security:
       - BearerAuth: []
       summary: 插件文件直接访问
-      tags:
-      - JS 插件
-  /jsplugin/{entryPath}/settings/external-paths:
-    get:
-      description: 返回管理员为该插件配置的可访问外部目录列表（需 fs:external 权限）。
-      parameters:
-      - description: 插件入口标识
-        in: path
-        name: entryPath
-        required: true
-        type: string
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: '{"paths":[]}'
-          schema:
-            additionalProperties: true
-            type: object
-      security:
-      - BearerAuth: []
-      summary: 获取插件外部目录配置
-      tags:
-      - JS 插件
-    put:
-      consumes:
-      - application/json
-      description: 管理员配置该插件可访问的外部目录列表。目录必须存在且为绝对路径。
-      parameters:
-      - description: 插件入口标识
-        in: path
-        name: entryPath
-        required: true
-        type: string
-      - description: '{'
-        in: body
-        name: request
-        required: true
-        schema:
-          type: object
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: '{"paths":[]}'
-          schema:
-            additionalProperties: true
-            type: object
-        "400":
-          description: 参数错误
-          schema:
-            additionalProperties:
-              type: string
-            type: object
-      security:
-      - BearerAuth: []
-      summary: 设置插件外部目录配置
       tags:
       - JS 插件
   /jsplugin/{entryPath}/static:

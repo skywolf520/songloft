@@ -119,16 +119,7 @@ func (h *BridgeHandler) getMusicPath() string {
 }
 
 func (h *BridgeHandler) getPluginExternalPaths() []string {
-	key := "jsplugin." + h.service.plugin.EntryPath + ".external_paths"
-	cfg, err := h.db.ConfigRepository().Get(context.Background(), key)
-	if err != nil {
-		return nil
-	}
-	var paths []string
-	if json.Unmarshal([]byte(cfg.Value), &paths) != nil {
-		return nil
-	}
-	return paths
+	return h.service.plugin.ExternalPaths
 }
 
 func (h *BridgeHandler) fsReadFile(data string) (string, error) {

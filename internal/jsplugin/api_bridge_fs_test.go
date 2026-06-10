@@ -100,13 +100,7 @@ func TestResolveFSPath_MusicPath_NotConfigured(t *testing.T) {
 func TestResolveFSPath_AbsolutePath(t *testing.T) {
 	h := newTestBridgeHandler(t, []string{PermFSExternal}, "test-plugin")
 	extDir := t.TempDir()
-	err := h.db.ConfigRepository().Set(context.Background(), &models.Config{
-		Key:   "jsplugin.test-plugin.external_paths",
-		Value: `["` + extDir + `"]`,
-	})
-	if err != nil {
-		t.Fatalf("set external_paths: %v", err)
-	}
+	h.service.plugin.ExternalPaths = []string{extDir}
 
 	target := filepath.Join(extDir, "subdir", "file.txt")
 	got, err := h.resolveFSPath(target)
@@ -122,13 +116,7 @@ func TestResolveFSPath_AbsolutePath(t *testing.T) {
 func TestResolveFSPath_AbsolutePath_DirItself(t *testing.T) {
 	h := newTestBridgeHandler(t, []string{PermFSExternal}, "test-plugin")
 	extDir := t.TempDir()
-	err := h.db.ConfigRepository().Set(context.Background(), &models.Config{
-		Key:   "jsplugin.test-plugin.external_paths",
-		Value: `["` + extDir + `"]`,
-	})
-	if err != nil {
-		t.Fatalf("set external_paths: %v", err)
-	}
+	h.service.plugin.ExternalPaths = []string{extDir}
 
 	got, err := h.resolveFSPath(extDir)
 	if err != nil {
@@ -151,15 +139,9 @@ func TestResolveFSPath_AbsolutePath_NoPermission(t *testing.T) {
 func TestResolveFSPath_AbsolutePath_NotInAllowed(t *testing.T) {
 	h := newTestBridgeHandler(t, []string{PermFSExternal}, "test-plugin")
 	extDir := t.TempDir()
-	err := h.db.ConfigRepository().Set(context.Background(), &models.Config{
-		Key:   "jsplugin.test-plugin.external_paths",
-		Value: `["` + extDir + `"]`,
-	})
-	if err != nil {
-		t.Fatalf("set external_paths: %v", err)
-	}
+	h.service.plugin.ExternalPaths = []string{extDir}
 
-	_, err = h.resolveFSPath("/not/in/allowed/dir")
+	_, err := h.resolveFSPath("/not/in/allowed/dir")
 	if err == nil {
 		t.Fatal("expected error for path not in allowed dirs")
 	}
@@ -172,16 +154,9 @@ func TestResolveFSPath_AbsolutePath_EscapeAllowed(t *testing.T) {
 	if err := os.MkdirAll(subDir, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	err := h.db.ConfigRepository().Set(context.Background(), &models.Config{
-		Key:   "jsplugin.test-plugin.external_paths",
-		Value: `["` + subDir + `"]`,
-	})
-	if err != nil {
-		t.Fatalf("set external_paths: %v", err)
-	}
+	h.service.plugin.ExternalPaths = []string{subDir}
 
-	// extDir is the parent of subDir — should NOT be allowed
-	_, err = h.resolveFSPath(extDir)
+	_, err := h.resolveFSPath(extDir)
 	if err == nil {
 		t.Fatal("expected error for path escaping allowed dir")
 	}

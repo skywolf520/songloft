@@ -119,7 +119,7 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
-                "description": "将元数据写入数据库和本地音频文件标签（仅本地歌曲）。cover_data(base64) 优先于 cover_url。非空字段覆盖，空值保留原值。",
+                "description": "将元数据写入数据库和本地音频文件标签（仅本地歌曲）。cover_data(base64) 优先于 cover_url。非空字段覆盖，空值保留原值。设置 clear_cover=true 可显式清空封面。",
                 "consumes": [
                     "application/json"
                 ],
@@ -144,7 +144,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/songloft_jsplugins-src_songloft-plugin-tag_internal_handlers.WriteSongTagsRequest"
+                            "$ref": "#/definitions/handlers.WriteSongTagsRequest"
                         }
                     }
                 ],
@@ -1114,95 +1114,6 @@ const docTemplate = `{
                         "description": "文件不存在或权限不足",
                         "schema": {
                             "type": "string"
-                        }
-                    }
-                }
-            }
-        },
-        "/jsplugin/{entryPath}/settings/external-paths": {
-            "get": {
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ],
-                "description": "返回管理员为该插件配置的可访问外部目录列表（需 fs:external 权限）。",
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "JS 插件"
-                ],
-                "summary": "获取插件外部目录配置",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "插件入口标识",
-                        "name": "entryPath",
-                        "in": "path",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "{\"paths\":[]}",
-                        "schema": {
-                            "type": "object",
-                            "additionalProperties": true
-                        }
-                    }
-                }
-            },
-            "put": {
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ],
-                "description": "管理员配置该插件可访问的外部目录列表。目录必须存在且为绝对路径。",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "JS 插件"
-                ],
-                "summary": "设置插件外部目录配置",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "插件入口标识",
-                        "name": "entryPath",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "description": "{",
-                        "name": "request",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "type": "object"
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "{\"paths\":[]}",
-                        "schema": {
-                            "type": "object",
-                            "additionalProperties": true
-                        }
-                    },
-                    "400": {
-                        "description": "参数错误",
-                        "schema": {
-                            "type": "object",
-                            "additionalProperties": {
-                                "type": "string"
-                            }
                         }
                     }
                 }
@@ -6068,6 +5979,38 @@ const docTemplate = `{
                 }
             }
         },
+        "handlers.WriteSongTagsRequest": {
+            "type": "object",
+            "properties": {
+                "album": {
+                    "type": "string"
+                },
+                "artist": {
+                    "type": "string"
+                },
+                "clear_cover": {
+                    "type": "boolean"
+                },
+                "cover_data": {
+                    "type": "string"
+                },
+                "cover_url": {
+                    "type": "string"
+                },
+                "genre": {
+                    "type": "string"
+                },
+                "lyrics": {
+                    "type": "string"
+                },
+                "title": {
+                    "type": "string"
+                },
+                "year": {
+                    "type": "integer"
+                }
+            }
+        },
         "handlers.hlsProxySettingRequest": {
             "type": "object",
             "properties": {
@@ -6394,6 +6337,13 @@ const docTemplate = `{
                 "entry_path": {
                     "description": "路由前缀（如 \"myplugin\"）",
                     "type": "string"
+                },
+                "external_paths": {
+                    "description": "可访问的外部绝对路径目录",
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
                 },
                 "file_mod_time": {
                     "type": "string"
@@ -7275,67 +7225,6 @@ const docTemplate = `{
                 "ScanStatusCancelling",
                 "ScanStatusCancelled"
             ]
-        },
-        "songloft_internal_handlers.WriteSongTagsRequest": {
-            "type": "object",
-            "properties": {
-                "album": {
-                    "type": "string"
-                },
-                "artist": {
-                    "type": "string"
-                },
-                "clear_cover": {
-                    "type": "boolean"
-                },
-                "cover_data": {
-                    "type": "string"
-                },
-                "cover_url": {
-                    "type": "string"
-                },
-                "genre": {
-                    "type": "string"
-                },
-                "lyrics": {
-                    "type": "string"
-                },
-                "title": {
-                    "type": "string"
-                },
-                "year": {
-                    "type": "integer"
-                }
-            }
-        },
-        "songloft_jsplugins-src_songloft-plugin-tag_internal_handlers.WriteSongTagsRequest": {
-            "type": "object",
-            "properties": {
-                "album": {
-                    "type": "string"
-                },
-                "artist": {
-                    "type": "string"
-                },
-                "cover_data": {
-                    "type": "string"
-                },
-                "cover_url": {
-                    "type": "string"
-                },
-                "genre": {
-                    "type": "string"
-                },
-                "lyrics": {
-                    "type": "string"
-                },
-                "title": {
-                    "type": "string"
-                },
-                "year": {
-                    "type": "integer"
-                }
-            }
         },
         "source.HealthClass": {
             "type": "string",

@@ -16,8 +16,6 @@ import (
 	"strings"
 	"unicode/utf8"
 
-	"songloft/internal/models"
-
 	"github.com/go-chi/chi/v5"
 )
 
@@ -116,8 +114,6 @@ func handlePluginAssets(w http.ResponseWriter, r *http.Request) {
 func (m *Manager) RegisterAPIRoutes(r chi.Router) {
 	r.Get("/api/v1/jsplugin/{entryPath}/files/*", m.handlePluginFileServe)
 	r.Head("/api/v1/jsplugin/{entryPath}/files/*", m.handlePluginFileServe)
-	r.Get("/api/v1/jsplugin/{entryPath}/settings/external-paths", m.handleGetExternalPaths)
-	r.Put("/api/v1/jsplugin/{entryPath}/settings/external-paths", m.handleSetExternalPaths)
 	r.HandleFunc("/api/v1/jsplugin/{entryPath}/*", m.handlePluginAPIRequest)
 }
 
@@ -735,18 +731,13 @@ func (m *Manager) getMusicPath() string {
 	return data.Path
 }
 
-// getPluginExternalPaths 从配置表读取插件的外部目录配置。
+// getPluginExternalPaths 从插件 manifest 声明的 externalPaths 字段读取外部目录配置。
 func (m *Manager) getPluginExternalPaths(entryPath string) []string {
-	key := "jsplugin." + entryPath + ".external_paths"
-	cfg, err := m.db.ConfigRepository().Get(context.Background(), key)
+	plugin, err := m.repo.GetByEntryPath(context.Background(), entryPath)
 	if err != nil {
 		return nil
 	}
-	var paths []string
-	if json.Unmarshal([]byte(cfg.Value), &paths) != nil {
-		return nil
-	}
-	return paths
+	return plugin.ExternalPaths
 }
 
 // registerPublicPaths 加载所有插件的 publicPaths 到内存缓存。
@@ -782,73 +773,4 @@ func (m *Manager) IsPublicPath(path string) bool {
 		}
 	}
 	return false
-}
-
-// handleGetExternalPaths 获取插件的外部目录配置。
-// @Summary 获取插件外部目录配置
-// @Description 返回管理员为该插件配置的可访问外部目录列表（需 fs:external 权限）。
-// @Tags JS 插件
-// @Produce json
-// @Param entryPath path string true "插件入口标识"
-// @Success 200 {object} map[string]interface{} "{"paths":[]}"
-// @Security BearerAuth
-// @Router /jsplugin/{entryPath}/settings/external-paths [get]
-func (m *Manager) handleGetExternalPaths(w http.ResponseWriter, r *http.Request) {
-	entryPath := chi.URLParam(r, "entryPath")
-	paths := m.getPluginExternalPaths(entryPath)
-	if paths == nil {
-		paths = []string{}
-	}
-	w.Header().Set("Content-Type", "application/json; charset=utf-8")
-	json.NewEncoder(w).Encode(map[string]interface{}{"paths": paths})
-}
-
-// handleSetExternalPaths 设置插件的外部目录配置。
-// @Summary 设置插件外部目录配置
-// @Description 管理员配置该插件可访问的外部目录列表。目录必须存在且为绝对路径。
-// @Tags JS 插件
-// @Accept json
-// @Produce json
-// @Param entryPath path string true "插件入口标识"
-// @Param request body object true "{"paths":["/app/audiobook"]}"
-// @Success 200 {object} map[string]interface{} "{"paths":[]}"
-// @Failure 400 {object} map[string]string "参数错误"
-// @Security BearerAuth
-// @Router /jsplugin/{entryPath}/settings/external-paths [put]
-func (m *Manager) handleSetExternalPaths(w http.ResponseWriter, r *http.Request) {
-	entryPath := chi.URLParam(r, "entryPath")
-
-	var req struct {
-		Paths []string `json:"paths"`
-	}
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		writeJSONError(w, http.StatusBadRequest, "invalid request body", err.Error())
-		return
-	}
-
-	// 校验每个路径必须是绝对路径且目录存在
-	for _, p := range req.Paths {
-		if !filepath.IsAbs(p) {
-			writeJSONError(w, http.StatusBadRequest, "path must be absolute", p)
-			return
-		}
-		info, err := os.Stat(p)
-		if err != nil || !info.IsDir() {
-			writeJSONError(w, http.StatusBadRequest, "directory does not exist", p)
-			return
-		}
-	}
-
-	// 存入 config 表
-	key := "jsplugin." + entryPath + ".external_paths"
-	pathsJSON, _ := json.Marshal(req.Paths)
-
-	configRepo := m.db.ConfigRepository()
-	if err := configRepo.Set(r.Context(), &models.Config{Key: key, Value: string(pathsJSON)}); err != nil {
-		writeJSONError(w, http.StatusInternalServerError, "failed to save config", err.Error())
-		return
-	}
-
-	w.Header().Set("Content-Type", "application/json; charset=utf-8")
-	json.NewEncoder(w).Encode(map[string]interface{}{"paths": req.Paths})
 }

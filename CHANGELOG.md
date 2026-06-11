@@ -1,3 +1,23 @@
+## [v2.8.0] - 2026-06-11
+### :sparkles: New Features
+- [`da56b08`](https://github.com/songloft-org/songloft/commit/da56b087f3d63172931ba26137099e5b70ce6b71) - **scan**: add toggle to enable/disable auto-create playlists on scan *(commit by [@hanxi](https://github.com/hanxi))*
+- [`f2a6c1e`](https://github.com/songloft-org/songloft/commit/f2a6c1e26c00592e3b0e7352e025218bdf607b48) - **jsplugin**: externalPaths 改为 manifest 声明，删除管理员 API *(PR [#151](https://github.com/songloft-org/songloft/pull/151) by [@hanxi](https://github.com/hanxi))*
+- [`f313243`](https://github.com/songloft-org/songloft/commit/f313243fe0846459a77e9f08169214196e08756e) - **api**: 暴露 lyric_remote_url 字段，支持编辑网络歌曲歌词 URL *(PR [#141](https://github.com/songloft-org/songloft/pull/141) by [@hanxi](https://github.com/hanxi))*
+- [`afc45a6`](https://github.com/songloft-org/songloft/commit/afc45a63b024928514f874736bae2cb0b911b886) - **tracely**: 支持安装/升级统计上报，配置改为三变量注入 *(commit by [@hanxi](https://github.com/hanxi))*
+
+### :bug: Bug Fixes
+- [`99a4d4f`](https://github.com/songloft-org/songloft/commit/99a4d4f704784feb09cdb7db7e9c7fe6df4f0aef) - [#145](https://github.com/songloft-org/songloft/pull/145) [#147](https://github.com/songloft-org/songloft/pull/147) - WriteTags damaged cover cleanup + playlist cover fallback to songs *(PR [#150](https://github.com/songloft-org/songloft/pull/150) by [@laihya](https://github.com/laihya))*
+- [`1e76796`](https://github.com/songloft-org/songloft/commit/1e767963e309daf0882d4150bc6ddfffdd997a4c) - **jsplugin**: resolveFSPath 支持 music:// 和绝对路径 *(PR [#151](https://github.com/songloft-org/songloft/pull/151) by [@hanxi](https://github.com/hanxi))*
+- [`d0c7140`](https://github.com/songloft-org/songloft/commit/d0c71404620fc365622780818ef01d07eb348354) - **scan**: chromaprint 指纹被歌词/元数据污染 *(PR [#146](https://github.com/songloft-org/songloft/pull/146) by [@hanxi](https://github.com/hanxi))*
+
+### :memo: Documentation Changes
+- [`e43a1c9`](https://github.com/songloft-org/songloft/commit/e43a1c917221ba5eb822a9de99c62b192f03e868) - update CHANGELOG for v2.7.0 *(commit by [@github-actions[bot]](https://github.com/apps/github-actions))*
+
+### :wrench: Chores
+- [`a2c4860`](https://github.com/songloft-org/songloft/commit/a2c4860b0b9f31a66b78d8c0a90f13e5ae91e76b) - bump plugin submodules (tag v1.0.6, dav v1.0.4, subsonic v2.0.1) *(commit by [@hanxi](https://github.com/hanxi))*
+- [`dceab9e`](https://github.com/songloft-org/songloft/commit/dceab9e397e4d3b140e073b944caa90054bb0785) - release version 2.8.0 *(commit by [@hanxi](https://github.com/hanxi))*
+
+
 ## [v2.7.0] - 2026-06-09
 ### :sparkles: New Features
 - [`9b3fb55`](https://github.com/songloft-org/songloft/commit/9b3fb55cd59e62f74eefefb1466e0634c549d147) - **jsplugin**: support pathPrefix param in songs.list bridge *(commit by [@hanxi](https://github.com/hanxi))*
@@ -1209,3 +1229,4 @@
 [v2.6.3]: https://github.com/songloft-org/songloft/compare/v2.6.2...v2.6.3
 [v2.6.4]: https://github.com/songloft-org/songloft/compare/v2.6.3...v2.6.4
 [v2.7.0]: https://github.com/songloft-org/songloft/compare/v2.6.4...v2.7.0
+[v2.8.0]: https://github.com/songloft-org/songloft/compare/v2.7.0...v2.8.0

@@ -7,7 +7,6 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
-	"syscall"
 
 	"songloft/internal/services"
 	"songloft/internal/services/playactivity"
@@ -199,12 +198,7 @@ func (h *CacheHandler) HandleValidateCacheDir(w http.ResponseWriter, r *http.Req
 		return
 	}
 
-	var total, free int64
-	var fs syscall.Statfs_t
-	if err := syscall.Statfs(req.Path, &fs); err == nil {
-		total = int64(fs.Blocks) * int64(fs.Bsize)
-		free = int64(fs.Bavail) * int64(fs.Bsize)
-	}
+	total, free := getDiskSpace(req.Path)
 
 	respondJSON(w, http.StatusOK, dirValidateResponse{
 		Valid:     true,

@@ -2,12 +2,44 @@ package handlers
 
 import (
 	"encoding/json"
+	"fmt"
 	"log/slog"
 	"net/http"
+	"os"
+	"path/filepath"
+	"syscall"
 
 	"songloft/internal/services"
 	"songloft/internal/services/playactivity"
 )
+
+func validateDirWritable(dir string) error {
+	if err := os.MkdirAll(dir, 0755); err != nil {
+		return fmt.Errorf("无法创建目录: %w", err)
+	}
+	testFile := filepath.Join(dir, ".songloft_write_test")
+	f, err := os.Create(testFile)
+	if err != nil {
+		return fmt.Errorf("目录不可写: %w", err)
+	}
+	f.Close()
+	os.Remove(testFile)
+	return nil
+}
+
+// dirValidateRequest 目录验证请求
+type dirValidateRequest struct {
+	Path string `json:"path"`
+}
+
+// dirValidateResponse 目录验证响应
+type dirValidateResponse struct {
+	Valid     bool   `json:"valid"`
+	Created   bool   `json:"created"`
+	TotalSize int64  `json:"total_size"`
+	FreeSize  int64  `json:"free_size"`
+	Error     string `json:"error,omitempty"`
+}
 
 // CacheHandler 音乐缓存管理处理器。
 //
@@ -73,27 +105,27 @@ func (h *CacheHandler) HandleCleanCache(w http.ResponseWriter, r *http.Request) 
 
 // HandleGetCacheConfig 获取缓存配置
 // @Summary 获取缓存配置
-// @Description 获取服务端音乐缓存的配置信息,包括最大缓存大小限制
+// @Description 获取服务端音乐缓存的配置信息,包括最大缓存大小限制和缓存目录路径。cache_dir 为空表示使用 default_cache_dir。
 // @Tags 缓存管理
 // @Accept json
 // @Produce json
-// @Success 200 {object} services.CacheConfig "缓存配置"
+// @Success 200 {object} services.CacheConfigResponse "缓存配置"
 // @Failure 500 {object} map[string]string "服务器错误"
 // @Security BearerAuth
 // @Router /cache-manage/config [get]
 func (h *CacheHandler) HandleGetCacheConfig(w http.ResponseWriter, r *http.Request) {
-	cfg := h.cacheService.GetCacheConfig()
-	respondJSON(w, http.StatusOK, cfg)
+	resp := h.cacheService.GetCacheConfigResponse()
+	respondJSON(w, http.StatusOK, resp)
 }
 
 // HandleUpdateCacheConfig 更新缓存配置
 // @Summary 更新缓存配置
-// @Description 更新服务端音乐缓存的配置,如最大缓存大小。更新后会自动触发 LRU 淘汰检查。
+// @Description 更新服务端音乐缓存的配置,如最大缓存大小和缓存目录。cache_dir 为空字符串时恢复使用默认目录。更新后会自动触发 LRU 淘汰检查。切换目录时不会自动迁移旧缓存文件。
 // @Tags 缓存管理
 // @Accept json
 // @Produce json
 // @Param request body services.CacheConfig true "缓存配置"
-// @Success 200 {object} services.CacheConfig "更新后的缓存配置"
+// @Success 200 {object} services.CacheConfigResponse "更新后的缓存配置"
 // @Failure 400 {object} map[string]string "请求参数无效"
 // @Failure 500 {object} map[string]string "更新失败"
 // @Security BearerAuth
@@ -110,11 +142,74 @@ func (h *CacheHandler) HandleUpdateCacheConfig(w http.ResponseWriter, r *http.Re
 		return
 	}
 
+	if cfg.CacheDir != "" {
+		if !filepath.IsAbs(cfg.CacheDir) {
+			respondError(w, http.StatusBadRequest, "缓存目录必须为绝对路径", nil)
+			return
+		}
+		if err := validateDirWritable(cfg.CacheDir); err != nil {
+			respondError(w, http.StatusBadRequest, "缓存目录不可用: "+err.Error(), err)
+			return
+		}
+	}
+
 	if err := h.cacheService.UpdateCacheConfig(cfg); err != nil {
 		slog.Error("更新缓存配置失败", "error", err)
 		respondError(w, http.StatusInternalServerError, "更新缓存配置失败", err)
 		return
 	}
 
-	respondJSON(w, http.StatusOK, cfg)
+	resp := h.cacheService.GetCacheConfigResponse()
+	respondJSON(w, http.StatusOK, resp)
+}
+
+// HandleValidateCacheDir 验证缓存目录
+// @Summary 验证缓存目录
+// @Description 验证指定目录是否可用作缓存目录。目录不存在时自动创建,检查可写性并返回磁盘空间信息。
+// @Tags 缓存管理
+// @Accept json
+// @Produce json
+// @Param request body dirValidateRequest true "目录路径"
+// @Success 200 {object} dirValidateResponse "验证结果"
+// @Failure 400 {object} map[string]string "请求参数无效"
+// @Security BearerAuth
+// @Router /cache-manage/validate-dir [post]
+func (h *CacheHandler) HandleValidateCacheDir(w http.ResponseWriter, r *http.Request) {
+	var req dirValidateRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		respondError(w, http.StatusBadRequest, "请求参数无效", err)
+		return
+	}
+	req.Path = filepath.Clean(req.Path)
+
+	if req.Path == "" {
+		respondError(w, http.StatusBadRequest, "路径不能为空", nil)
+		return
+	}
+	if !filepath.IsAbs(req.Path) {
+		respondJSON(w, http.StatusOK, dirValidateResponse{Error: "必须为绝对路径"})
+		return
+	}
+
+	_, statErr := os.Stat(req.Path)
+	created := os.IsNotExist(statErr)
+
+	if err := validateDirWritable(req.Path); err != nil {
+		respondJSON(w, http.StatusOK, dirValidateResponse{Error: err.Error()})
+		return
+	}
+
+	var total, free int64
+	var fs syscall.Statfs_t
+	if err := syscall.Statfs(req.Path, &fs); err == nil {
+		total = int64(fs.Blocks) * int64(fs.Bsize)
+		free = int64(fs.Bavail) * int64(fs.Bsize)
+	}
+
+	respondJSON(w, http.StatusOK, dirValidateResponse{
+		Valid:     true,
+		Created:   created,
+		TotalSize: total,
+		FreeSize:  free,
+	})
 }

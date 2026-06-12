@@ -80,9 +80,6 @@ func (a *App) setupAPIV1Router() {
 		a.configService,
 	)
 
-	// 创建转换处理器（网络歌曲→本地歌曲）
-	convertHandler := handlers.NewConvertHandler(a.convertService)
-
 	// 创建日志等级处理器（持有 App 的 LevelVar，PUT 时即时切换运行时等级）
 	logHandler := handlers.NewLogHandler(a.configService, a.logLevelVar)
 
@@ -153,12 +150,6 @@ func (a *App) setupAPIV1Router() {
 			r.Post("/playlists/{id}/cover", playlistHandler.UploadPlaylistCover)
 			r.Get("/playlists/{id}/cover", playlistHandler.GetPlaylistCover)
 
-			// 网络歌曲→本地歌曲转换
-			r.Post("/playlists/{id}/convert-to-local", convertHandler.ConvertPlaylist)
-			r.Get("/playlists/{id}/convert-progress", convertHandler.GetConvertProgress)
-			r.Post("/playlists/{id}/convert-progress/cancel", convertHandler.CancelConvert)
-			r.Get("/settings/auto-convert", convertHandler.GetAutoConvertSetting)
-			r.Put("/settings/auto-convert", convertHandler.UpdateAutoConvertSetting)
 			r.Get("/settings/hls-proxy", hlsHandler.GetProxySetting)
 			r.Put("/settings/hls-proxy", hlsHandler.UpdateProxySetting)
 			r.Get("/settings/music-path", scanHandler.GetMusicPathSetting)
@@ -225,6 +216,7 @@ func (a *App) setupAPIV1Router() {
 			r.Post("/cache-manage/clean", cacheHandler.HandleCleanCache)
 			r.Get("/cache-manage/config", cacheHandler.HandleGetCacheConfig)
 			r.Put("/cache-manage/config", cacheHandler.HandleUpdateCacheConfig)
+			r.Post("/cache-manage/validate-dir", cacheHandler.HandleValidateCacheDir)
 
 			// 升级管理模块
 			r.Get("/upgrade/versions", upgradeHandler.GetVersions)

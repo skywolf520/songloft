@@ -43,7 +43,6 @@ type App struct {
 	upgradeService     *services.UpgradeService
 	cacheService       *services.CacheService
 	backupService      *services.BackupService
-	convertService     *services.ConvertService
 	urlResolver        *services.InternalURLResolver // 共享:把 JS 插件相对路径解析为本机绝对 URL + access_token
 	lyricFetcher       *services.LyricFetcher        // 共享:解包插件歌词 JSON 拿 LRC 文本
 	scanner            *services.Scanner
@@ -256,7 +255,6 @@ func (a *App) Init() error {
 	a.sourceMetrics = source.NewSourceMetrics(source.DefaultMetricsOpts())
 
 	// 为内部 HTTP 调用准备 access_token,用于解析 JS 插件代理的相对路径
-	// (convert_service 下载歌曲、song_handler 拉歌词等)
 	internalToken, err := a.authService.GeneratePluginToken(context.Background())
 	if err != nil {
 		return fmt.Errorf("生成内部 token 失败: %w", err)
@@ -270,27 +268,6 @@ func (a *App) Init() error {
 
 	a.urlResolver = services.NewInternalURLResolver(internalServerPort, internalToken)
 	a.lyricFetcher = services.NewLyricFetcher(a.urlResolver, nil)
-
-	// 创建转换服务：把网络歌曲落地到本地音乐库
-	a.convertService = services.NewConvertService(
-		db,
-		a.songService,
-		a.playlistService,
-		a.cacheService,
-		a.configService,
-		a.metadataExtractor,
-		func() string {
-			var cfg struct {
-				Path string `json:"path"`
-			}
-			if err := a.configService.GetJSON("music_path", &cfg); err != nil {
-				return "music"
-			}
-			return cfg.Path
-		},
-		a.urlResolver,
-		a.lyricFetcher,
-	)
 
 	// 初始化 JS 插件管理器（必须在 setupRouter 之前，因为路由注册需要访问 jsPluginManager）
 	jsPluginsDir, err := filepath.Abs(filepath.Join(filepath.Dir(a.config.DBPath), "jsplugins"))
@@ -344,11 +321,6 @@ func (a *App) Init() error {
 	})
 	a.sourceOrchestrator = sourceOrchestrator
 	a.cacheService.SetOrchestrator(sourceOrchestrator)
-	a.convertService.SetOrchestrator(sourceOrchestrator)
-	// 缓存下载完成 → 触发自动转本地(由 ConvertService 内部按开关 + 歌曲状态判断是否真正执行)。
-	// 手动批量转换走 ConvertService.convertOne 直连 Orchestrator,绕开 CacheService.Get,
-	// 不会重复触发;AsyncReassign 不下载到 cache,也不会误触发。
-	a.cacheService.SetOnDownloaded(a.convertService.OnCacheDownloaded)
 
 	// 初始化 Tracely 监控客户端（仅在编译时注入了 AppSecret 与 Host 时启用）
 	if tracelycfg.Enabled() {

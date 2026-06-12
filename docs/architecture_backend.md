@@ -71,8 +71,7 @@ HTTP Server (main.go)
 - `jsplugin.go`: JS 插件管理（上传 `.jsplugin.zip`、启用/禁用、删除、更新检查）
 - `upgrade.go`: 版本升级（检查更新、执行升级、重置基础镜像）
 - `proxy.go`: 资源代理（解决外部 CDN 的 CORS 限制，支持流式转发和 Range 请求）
-- `cache.go`: 音乐缓存（按 hash 缓存网络歌曲，支持 HEAD 探测和 GET 下载）
-- `convert.go`: 网络歌曲→本地歌曲转换（启动整歌单转换、进度查询、取消、自动转换开关）
+- `cache.go`: 音乐缓存管理（统计、清理、配置、自定义目录验证）
 - `version.go`: 版本信息
 - `health.go`: 健康检查
 - `response.go`: 统一 JSON 响应和错误响应工具函数
@@ -117,10 +116,8 @@ HTTP Server (main.go)
 - `song_service.go`: 歌曲服务（CRUD、批量操作、时长回填）
 - `playlist_service.go`: 歌单服务（CRUD、歌曲管理、自动创建）
 - `upgrade_service.go`: 版本升级服务（获取版本信息、执行升级、重置）
-- `cache_service.go`: 音乐缓存服务（按 hash 缓存网络歌曲文件，支持并发下载去重）
-- `cache_service_song.go`: 缓存服务针对 song 维度的辅助（命中查找、关联清理等）
-- `convert_service.go`: 网络歌曲→本地歌曲转换服务（按歌单分目录存储、文件名安全清理、限速防风控、自动模式 worker 限流、URL 歌词自动下载并 cache、转换后写入文件 tag/封面/歌词）
-- `convert_progress.go`: 转换进度跟踪（按 playlistID 隔离的状态管理，支持多歌单并行进度）
+- `cache_service.go`: 音乐缓存服务（LRU 淘汰、自定义缓存目录、容量上限配置）
+- `cache_service_song.go`: 缓存服务针对 song 维度的辅助（命中查找、并发下载去重、关联清理等）
 - `internal_url.go`: 内部回环 URL 构造（把相对 URL 拼成 `http://127.0.0.1:{port}/...?access_token=...`，给 convert/cache 调插件用）
 - `whitelist.go`: 域名白名单校验（SSRF 防护，阻止内网地址访问）
 - `source/`: 音源适配子包 — `fetcher`（HTTP 取数据）、`resolver`（URL 解析）、`validator`（参数校验）、`orchestrator`（编排）、`metrics`（指标）。具体实现见 `internal/app/source_adapters.go` 的接口绑定
@@ -233,10 +230,7 @@ Service 层注入 `database.DB` 接口；单表写直接拿 `db.SongRepository()
 - `/api/v1/scan/*` - 扫描管理接口（异步扫描、进度查询、取消）
 - `/api/v1/upgrade/*` - 版本升级接口（仅 Docker 环境可用，含重置功能）
 - `/api/v1/proxy` - 资源代理接口（解决 CORS，含 SSRF 防护）
-- `/api/v1/cache/{hash}` - 音乐缓存接口（按 hash 缓存网络歌曲）
-- `/api/v1/playlists/{id}/convert-to-local` - 启动歌单网络歌曲→本地歌曲转换
-- `/api/v1/playlists/{id}/convert-progress` - 查询转换进度（GET）/ 取消（POST `/cancel`）
-- `/api/v1/settings/auto-convert` - 自动转换开关（GET/PUT）
+- `/api/v1/cache-manage/*` - 音乐缓存管理（统计/清理/配置/目录验证）
 - `/api/v1/settings/hls-proxy` - HLS 电台代理开关（GET/PUT）
 - `/api/v1/settings/http-proxy` - 通用 HTTP 代理配置（GET/PUT）
 - `/api/v1/settings/music-path` - 音乐路径与扫描排除（GET/PUT）

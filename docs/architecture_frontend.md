@@ -120,13 +120,13 @@ songloft-player/lib/
 │   │           └── playlist_drawer.dart   # 播放列表抽屉
 │   ├── playlist/                    # 歌单模块
 │   │   ├── data/
-│   │   │   ├── playlist_api.dart    # 含歌单 CRUD + 网络歌曲转本地 (convertPlaylistToLocal / getConvertProgress / cancelConvert) + 自动转换开关
+│   │   │   ├── playlist_api.dart    # 歌单 CRUD
 │   │   │   └── playlist_repository.dart
 │   │   ├── domain/
 │   │   │   └── playlist.dart        # 歌单模型
 │   │   └── presentation/
 │   │       ├── playlists_page.dart   # 歌单列表页
-│   │       ├── playlist_detail_page.dart  # 歌单详情页(含"转换为本地"入口 + 进度 banner + 跨页面恢复轮询)
+│   │       ├── playlist_detail_page.dart  # 歌单详情页
 │   │       ├── providers/
 │   │       │   ├── playlist_provider.dart
 │   │       │   └── playlist_view_provider.dart
@@ -136,7 +136,7 @@ songloft-player/lib/
 │   │           └── song_cover_picker_modal.dart  # 歌曲封面选择弹窗
 │   └── settings/                    # 设置模块
 │       ├── data/
-│       │   ├── cache_api.dart       # 音乐缓存 API（容量查询、清理）
+│       │   ├── cache_api.dart       # 音乐缓存 API（统计、清理、配置、目录验证）
 │       │   ├── config_api.dart      # 配置 API
 │       │   ├── directory_api.dart   # 目录浏览 API（音乐目录选择器用）
 │       │   ├── frontend_version_api.dart  # 前端版本检查 API
@@ -147,7 +147,7 @@ songloft-player/lib/
 │           ├── providers/
 │           │   └── settings_provider.dart
 │           └── widgets/
-│               ├── cache_manager.dart        # 音乐缓存管理面板
+│               ├── cache_manager.dart        # 音乐缓存管理面板（含自定义缓存目录对话框）
 │               ├── config_manager.dart       # 配置管理
 │               ├── exclude_dir_manager.dart  # 扫描排除目录管理
 │               ├── frontend_upgrade_dialog.dart  # 前端升级对话框
@@ -155,8 +155,6 @@ songloft-player/lib/
 │               ├── theme_selector.dart       # 主题选择器
 │               ├── token_manager.dart        # 令牌管理
 │               └── upgrade_dialog.dart       # 后端升级对话框
-│               // settings_page 在"音乐库管理"分组下含 SwitchListTile:网络歌曲自动转为本地,
-│               // 对应 providers/settings_provider.dart::autoConvertEnabledProvider
 └── shared/                          # 共享模块
     ├── layouts/
     │   ├── shell_layout.dart        # ShellRoute 主布局（导航 + 播放器）

@@ -553,7 +553,7 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
-                "description": "获取服务端音乐缓存的配置信息,包括最大缓存大小限制",
+                "description": "获取服务端音乐缓存的配置信息,包括最大缓存大小限制和缓存目录路径。cache_dir 为空表示使用 default_cache_dir。",
                 "consumes": [
                     "application/json"
                 ],
@@ -568,7 +568,7 @@ const docTemplate = `{
                     "200": {
                         "description": "缓存配置",
                         "schema": {
-                            "$ref": "#/definitions/services.CacheConfig"
+                            "$ref": "#/definitions/services.CacheConfigResponse"
                         }
                     },
                     "500": {
@@ -588,7 +588,7 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
-                "description": "更新服务端音乐缓存的配置,如最大缓存大小。更新后会自动触发 LRU 淘汰检查。",
+                "description": "更新服务端音乐缓存的配置,如最大缓存大小和缓存目录。cache_dir 为空字符串时恢复使用默认目录。更新后会自动触发 LRU 淘汰检查。切换目录时不会自动迁移旧缓存文件。",
                 "consumes": [
                     "application/json"
                 ],
@@ -614,7 +614,7 @@ const docTemplate = `{
                     "200": {
                         "description": "更新后的缓存配置",
                         "schema": {
-                            "$ref": "#/definitions/services.CacheConfig"
+                            "$ref": "#/definitions/services.CacheConfigResponse"
                         }
                     },
                     "400": {
@@ -665,6 +665,54 @@ const docTemplate = `{
                     },
                     "500": {
                         "description": "服务器错误",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/cache-manage/validate-dir": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "验证指定目录是否可用作缓存目录。目录不存在时自动创建,检查可写性并返回磁盘空间信息。",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "缓存管理"
+                ],
+                "summary": "验证缓存目录",
+                "parameters": [
+                    {
+                        "description": "目录路径",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/handlers.dirValidateRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "验证结果",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.dirValidateResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "请求参数无效",
                         "schema": {
                             "type": "object",
                             "additionalProperties": {
@@ -2630,166 +2678,6 @@ const docTemplate = `{
                 }
             }
         },
-        "/playlists/{id}/convert-progress": {
-            "get": {
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ],
-                "description": "获取指定歌单的网络歌曲→本地歌曲转换进度,无运行任务时返回 idle 状态",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "歌单转换"
-                ],
-                "summary": "获取歌单转换进度",
-                "parameters": [
-                    {
-                        "type": "integer",
-                        "description": "歌单ID",
-                        "name": "id",
-                        "in": "path",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "转换进度信息",
-                        "schema": {
-                            "$ref": "#/definitions/services.ConvertProgress"
-                        }
-                    },
-                    "400": {
-                        "description": "无效的歌单ID",
-                        "schema": {
-                            "type": "object",
-                            "additionalProperties": {
-                                "type": "string"
-                            }
-                        }
-                    }
-                }
-            }
-        },
-        "/playlists/{id}/convert-progress/cancel": {
-            "post": {
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ],
-                "description": "取消指定歌单的网络歌曲→本地歌曲转换任务,返回 cancelled 字段表示是否成功取消",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "歌单转换"
-                ],
-                "summary": "取消歌单转换",
-                "parameters": [
-                    {
-                        "type": "integer",
-                        "description": "歌单ID",
-                        "name": "id",
-                        "in": "path",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "取消结果,cancelled 为 true 表示成功取消",
-                        "schema": {
-                            "type": "object",
-                            "additionalProperties": {
-                                "type": "boolean"
-                            }
-                        }
-                    },
-                    "400": {
-                        "description": "无效的歌单ID",
-                        "schema": {
-                            "type": "object",
-                            "additionalProperties": {
-                                "type": "string"
-                            }
-                        }
-                    }
-                }
-            }
-        },
-        "/playlists/{id}/convert-to-local": {
-            "post": {
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ],
-                "description": "异步将歌单内所有网络歌曲下载到本地音乐库（按 music_path/{歌单名}/{艺术家 - 标题} 命名），立即返回，可通过进度接口查询状态。同一歌单同时只允许一个任务运行。",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "歌单转换"
-                ],
-                "summary": "启动歌单转换为本地歌单",
-                "parameters": [
-                    {
-                        "type": "integer",
-                        "description": "歌单ID",
-                        "name": "id",
-                        "in": "path",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "202": {
-                        "description": "转换任务已启动",
-                        "schema": {
-                            "type": "object",
-                            "additionalProperties": true
-                        }
-                    },
-                    "400": {
-                        "description": "无效的歌单ID 或 歌单中没有需要转换的网络歌曲",
-                        "schema": {
-                            "type": "object",
-                            "additionalProperties": {
-                                "type": "string"
-                            }
-                        }
-                    },
-                    "409": {
-                        "description": "该歌单已有转换任务在运行",
-                        "schema": {
-                            "type": "object",
-                            "additionalProperties": {
-                                "type": "string"
-                            }
-                        }
-                    },
-                    "500": {
-                        "description": "启动转换失败",
-                        "schema": {
-                            "type": "object",
-                            "additionalProperties": {
-                                "type": "string"
-                            }
-                        }
-                    }
-                }
-            }
-        },
         "/playlists/{id}/cover": {
             "get": {
                 "security": [
@@ -3645,95 +3533,6 @@ const docTemplate = `{
                         "description": "扫描进度信息",
                         "schema": {
                             "$ref": "#/definitions/services.ScanProgress"
-                        }
-                    }
-                }
-            }
-        },
-        "/settings/auto-convert": {
-            "get": {
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ],
-                "description": "获取“网络歌曲缓存完成后自动转为本地”开关的当前状态",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "歌单转换"
-                ],
-                "summary": "获取自动转换开关",
-                "responses": {
-                    "200": {
-                        "description": "返回 enabled 字段表示开关状态",
-                        "schema": {
-                            "type": "object",
-                            "additionalProperties": {
-                                "type": "boolean"
-                            }
-                        }
-                    }
-                }
-            },
-            "put": {
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ],
-                "description": "开启或关闭“网络歌曲缓存完成后自动转为本地”功能。开启后,任何 remote 类型歌曲缓存下载完成时,会异步在其所在的所有普通歌单中触发转换。",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "歌单转换"
-                ],
-                "summary": "更新自动转换开关",
-                "parameters": [
-                    {
-                        "description": "开关请求",
-                        "name": "request",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/handlers.AutoConvertRequest"
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "返回 enabled 字段表示更新后的开关状态",
-                        "schema": {
-                            "type": "object",
-                            "additionalProperties": {
-                                "type": "boolean"
-                            }
-                        }
-                    },
-                    "400": {
-                        "description": "请求格式错误",
-                        "schema": {
-                            "type": "object",
-                            "additionalProperties": {
-                                "type": "string"
-                            }
-                        }
-                    },
-                    "500": {
-                        "description": "保存配置失败",
-                        "schema": {
-                            "type": "object",
-                            "additionalProperties": {
-                                "type": "string"
-                            }
                         }
                     }
                 }
@@ -5930,16 +5729,6 @@ const docTemplate = `{
         }
     },
     "definitions": {
-        "handlers.AutoConvertRequest": {
-            "type": "object",
-            "properties": {
-                "enabled": {
-                    "description": "是否启用自动转换",
-                    "type": "boolean",
-                    "example": true
-                }
-            }
-        },
         "handlers.AutoScanSetting": {
             "type": "object",
             "properties": {
@@ -6008,6 +5797,34 @@ const docTemplate = `{
                 },
                 "year": {
                     "type": "integer"
+                }
+            }
+        },
+        "handlers.dirValidateRequest": {
+            "type": "object",
+            "properties": {
+                "path": {
+                    "type": "string"
+                }
+            }
+        },
+        "handlers.dirValidateResponse": {
+            "type": "object",
+            "properties": {
+                "created": {
+                    "type": "boolean"
+                },
+                "error": {
+                    "type": "string"
+                },
+                "free_size": {
+                    "type": "integer"
+                },
+                "total_size": {
+                    "type": "integer"
+                },
+                "valid": {
+                    "type": "boolean"
                 }
             }
         },
@@ -6949,8 +6766,26 @@ const docTemplate = `{
         "services.CacheConfig": {
             "type": "object",
             "properties": {
+                "cache_dir": {
+                    "description": "自定义缓存目录，空字符串表示使用默认目录",
+                    "type": "string"
+                },
                 "max_size": {
                     "description": "最大缓存大小（字节），0 表示无限制",
+                    "type": "integer"
+                }
+            }
+        },
+        "services.CacheConfigResponse": {
+            "type": "object",
+            "properties": {
+                "cache_dir": {
+                    "type": "string"
+                },
+                "default_cache_dir": {
+                    "type": "string"
+                },
+                "max_size": {
                     "type": "integer"
                 }
             }
@@ -6971,105 +6806,6 @@ const docTemplate = `{
                     "type": "integer"
                 }
             }
-        },
-        "services.ConvertProgress": {
-            "type": "object",
-            "properties": {
-                "converted_songs": {
-                    "description": "已转换数",
-                    "type": "integer"
-                },
-                "current_song": {
-                    "description": "当前正在处理的歌曲",
-                    "type": "string"
-                },
-                "end_time": {
-                    "description": "结束时间",
-                    "type": "string"
-                },
-                "error": {
-                    "description": "致命错误",
-                    "type": "string"
-                },
-                "errors": {
-                    "description": "错误明细",
-                    "type": "array",
-                    "items": {
-                        "type": "string"
-                    }
-                },
-                "failed_songs": {
-                    "description": "失败数",
-                    "type": "integer"
-                },
-                "playlist_id": {
-                    "description": "歌单 ID",
-                    "type": "integer"
-                },
-                "processed_songs": {
-                    "description": "已处理数(成功+跳过+失败)",
-                    "type": "integer"
-                },
-                "skipped_songs": {
-                    "description": "跳过数(本地歌曲、已转过)",
-                    "type": "integer"
-                },
-                "start_time": {
-                    "description": "开始时间",
-                    "type": "string"
-                },
-                "status": {
-                    "description": "当前状态",
-                    "allOf": [
-                        {
-                            "$ref": "#/definitions/services.ConvertStatus"
-                        }
-                    ]
-                },
-                "total_songs": {
-                    "description": "待转换总数",
-                    "type": "integer"
-                },
-                "waiting": {
-                    "description": "是否处于风控限速等待中",
-                    "type": "boolean"
-                }
-            }
-        },
-        "services.ConvertStatus": {
-            "type": "string",
-            "enum": [
-                "idle",
-                "running",
-                "completed",
-                "failed",
-                "cancelling",
-                "cancelled"
-            ],
-            "x-enum-comments": {
-                "ConvertStatusCancelled": "已取消",
-                "ConvertStatusCancelling": "取消中",
-                "ConvertStatusCompleted": "已完成",
-                "ConvertStatusFailed": "失败",
-                "ConvertStatusIdle": "空闲",
-                "ConvertStatusRunning": "转换中"
-            },
-            "x-enum-descriptions": [
-                "空闲",
-                "转换中",
-                "已完成",
-                "失败",
-                "取消中",
-                "已取消"
-            ],
-            "x-enum-varnames": [
-                "ConvertStatusIdle",
-                "ConvertStatusRunning",
-                "ConvertStatusCompleted",
-                "ConvertStatusFailed",
-                "ConvertStatusCancelling",
-                "ConvertStatusCancelled"
-            ]
         },
         "services.FingerprintProgress": {
             "type": "object",

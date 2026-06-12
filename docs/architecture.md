@@ -140,9 +140,8 @@ make build-frontend-all            # 当前系统支持的所有平台
 1. **纯 Go 实现**：音频元数据提取、SQLite 驱动、QuickJS 运行时均为纯 Go 实现，无需 CGO，部署简单
 2. **JS 插件系统**：基于 QuickJS 的脚本插件架构，支持动态扩展音源能力，沙盒隔离 + 权限模型 + 健康检查 + 热更新
 3. **JWT 双 Token**：Access Token + Refresh Token，支持令牌撤销和管理
-4. **音乐缓存**：按 hash 缓存网络歌曲，支持并发下载去重
-5. **歌单转本地**：将歌单内网络歌曲落地到本地音乐库（按歌单分目录、可读文件名、限速防风控），支持手动+自动模式;转换后回写文件 tag (标题/艺术家/专辑/年份/歌词/封面);URL 歌词自动下载并 cache
-6. **音频 tag 读写**:pkg/tag 在原 dhowden/tag 基础上扩展 MP3 (ID3v2.3) 和 FLAC (Vorbis Comment + Picture) 写入,纯 Go 无外部依赖
+4. **音乐缓存**：播放远程歌曲时自动缓存，LRU 淘汰策略，支持自定义缓存目录和容量上限
+5. **音频 tag 读写**:pkg/tag 在原 dhowden/tag 基础上扩展 MP3 (ID3v2.3) 和 FLAC (Vorbis Comment + Picture) 写入,纯 Go 无外部依赖
 7. **资源代理**：内置 CORS 代理，含 SSRF 防护
 8. **数据库驱动配置**：配置存储在 SQLite，支持 JSON 格式和 API 动态更新
 9. **Tracely 监控**：心跳包、安装/升级统计、panic 捕获
@@ -187,7 +186,7 @@ make build-frontend-all            # 当前系统支持的所有平台
 
 - 内置歌单：收藏（id=1）、电台收藏（id=2），均带 `labels=["built_in"]`
 - 默认配置：`music_path`、`cover_storage_path`、`scan_config`、`ffprobe_path`、`jwt_secret`、`source_validation`、`source_fallback`、`source_metrics`
-- `music_cache_config` / `auto_convert_remote` 等不在迁移内预置，由对应 service 首次使用时按需写入
+- `music_cache_config` 等不在迁移内预置，由对应 service 首次使用时按需写入
 
 ## 扩展性设计
 

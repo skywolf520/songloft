@@ -60,13 +60,6 @@ func (c *CacheService) SetOrchestrator(o CacheSongFetcher) {
 	c.orchestrator = o
 }
 
-// SetOnDownloaded 注入缓存下载完成回调。
-// 仅在 Get 路径"真正下载并落入 cache"成功时触发;命中已存在缓存不触发。
-// 用于把"自动转本地"等下游副作用与 cache 主流程解耦。
-func (c *CacheService) SetOnDownloaded(fn func(songID int64)) {
-	c.onDownloaded = fn
-}
-
 // ErrNoOrchestrator orchestrator 未注入
 var ErrNoOrchestrator = errors.New("source orchestrator not configured")
 
@@ -316,10 +309,6 @@ func (c *CacheService) Get(ctx context.Context, song *models.Song) (string, erro
 	c.touchSongLRU(song.ID)
 	// 触发 LRU 淘汰
 	go c.EvictLRU()
-	// 通知下游(自动转本地等)。回调内部自带 goroutine + 去重,这里直接同步调即可。
-	if c.onDownloaded != nil {
-		c.onDownloaded(song.ID)
-	}
 	return finalPath, nil
 }
 

@@ -130,11 +130,11 @@ func (h *XxxHandler) Method(w http.ResponseWriter, r *http.Request) { ... }
 
 ### `/api/v1/settings/<name>` — 孤立配置端点（前端业务功能默认走这里）
 
-- 路径风格：`/settings/<kebab-case-name>`（如 `/settings/hls-proxy`、`/settings/music-path`、`/settings/auto-convert`、`/settings/http-proxy`）
+- 路径风格：`/settings/<kebab-case-name>`（如 `/settings/hls-proxy`、`/settings/music-path`、`/settings/http-proxy`）
 - 数据形态：**强类型** JSON（如 `{enabled: bool}` 或聚合对象），不是 `{value: string}`
 - 默认值：handler 内部承担（配置缺失时 GET 返回业务默认，PUT 时直接写入即可，**前端无需先 POST 创建**）
 - 副作用：在 PUT 内部直接触发（如 `music_path` PUT 完异步 `onMusicPathChanged` 重建 Scanner）
-- 归属：放进对应业务模块的 handler（如 hls-proxy 在 `HLSHandler`，music-path 在 `ScanHandler`，auto-convert 在 `ConvertHandler`），handler 同时持有 `*services.ConfigService` 完成读写
+- 归属：放进对应业务模块的 handler（如 hls-proxy 在 `HLSHandler`，music-path 在 `ScanHandler`），handler 同时持有 `*services.ConfigService` 完成读写
 - 命名套路：`Is<Name>Enabled() / Set<Name>Enabled(bool)` 业务方法 + `Get<Name>Setting / Update<Name>Setting` HTTP handler + `/settings/<name>` 路由
 
 ### `/api/v1/<module>/*` — 业务模块聚合端点（含配置）
@@ -161,7 +161,7 @@ func (h *XxxHandler) Method(w http.ResponseWriter, r *http.Request) { ... }
 
 ### 历史决策记录
 
-- 该规范在 2026-06 引入，背景：`hls_proxy_enabled` 默认未预置导致 PUT `/configs/{key}` 返回 404，发现项目里 `/configs` + `/settings/auto-convert` + `/cache-manage/config` 三种风格并存
+- 该规范在 2026-06 引入，背景：`hls_proxy_enabled` 默认未预置导致 PUT `/configs/{key}` 返回 404，发现项目里 `/configs` + `/settings/*` + `/cache-manage/config` 三种风格并存
 - 选定方向：业务端点是用户可见入口的**唯一来源**，通用 KV 退化为 admin 后门
 
 ---
@@ -261,21 +261,14 @@ Docker 镜像内含底包 `/app/songloft`，持久化 data 卷存放实际运行
 - 启动时从 config 表加载已保存的代理地址（`app.go`）；PUT 时即时生效无需重启
 - 当前已接入的 service：`jsplugin/registry.go`、`jsplugin/package.go`、`services/upgrade_service.go`、`handlers/jsplugin_registry.go`（downloadZIP）
 
-### 歌单转本地（convert_service）
+### 音乐缓存（cache_service）
 
-- 落地路径：`music_path/{清理后歌单名}/{清理后艺术家} - {清理后标题}.{ext}`，与 scanner 保持**相对路径**格式
-  - **不要** `filepath.Abs`，否则重扫去重失败，产生重复 song
-- cache miss 时走 `convert_service.fetchToTemp` 直接 HTTP GET，**不**经过 `cache_service` 的 inflight
-  - 原因：部分 JS 插件的 `music/url/{hash}` 在 cache inflight 时会 302 回 cache endpoint → 自循环死锁
-- 转换时把 song.URL 相对路径拼成 `http://127.0.0.1:{port}/...?access_token={plugin_token}`（用 `authService.GeneratePluginToken`）
-- 手动批量：cache miss 触发新下载后串行 `sleep 3s + 0-2s jitter` 防风控；cache 命中不限速
-- `LyricSource == "url"` 时自动 GET 歌词 URL（期望 `{"code":0,"data":{"lyric":"..."}}`），回填后改 `lyric_source = "cached"`
-- 转换后 `tag.WriteTag` 写入 title/artist/album/year/lyrics/cover
-- **id 不变（原地 UPDATE）**：转换走 `applyConvertInPlace`，事务里重读 song + Update，`song.id` 跨"远程→本地"保持不变；前端持有的 song id（播放队列 / 收藏 / 歌词页等）无需感知
-- 多歌单同首歌共享同一 local row：第一个完成转换的歌单决定 `file_path` 归宿目录；其他歌单的 `convertOne` 看到 `Type != remote` 直接 skip。`convertOneInflight` 用 `<songID>` 维度去重，防止两个 caller 同时落两份 orphan 文件
-- 转后**保留** `url / lyric_remote_url / plugin_entry_path / source_data / dedup_key`：让 `UpsertRemote` 再次添加同首远程歌时,通过 `(plugin_entry_path, dedup_key)` 联合命中本行,仅复用 id 不覆盖任何字段（用户感知："系统识别出本地已有此歌,直接加进新歌单"）
-- `LyricURLPath` 的"有歌词"判断收紧到 `lyric != "" || (lyric_source == "url" && lyric_remote_url != "")`：保留 `lyric_remote_url` 作档案后，必须按 `lyric_source` 才认它为有效来源，否则会误报"有歌词"让前端发出注定 404 的请求
-- 互斥：同歌单同时只允许一个转换任务，后到者让位
+- 播放远程歌曲时透明缓存音频文件到服务端，歌曲仍为 `remote` 类型，缓存命中时直接返回
+- 缓存目录默认 `{data_dir}/music_cache/`，可通过 `PUT /api/v1/cache-manage/config` 的 `cache_dir` 字段自定义为绝对路径
+- 启动时从 `music_cache_config` 配置读取自定义目录；运行时切换目录会自动重建 LRU 索引，不迁移旧文件
+- LRU 淘汰：超出 `max_size`（默认 1GB）时按最后访问时间淘汰，`max_size=0` 表示不限制
+- `POST /api/v1/cache-manage/validate-dir` 可预先验证目录（自动创建 + 可写性检查 + 返回磁盘空间）
+- inflight 去重：同 `song.ID` 的并发请求只下载一次；首请求被 `ctx.Canceled` 时后续等待者自动重试
 
 ### 文件搬移：跨设备 rename 陷阱
 

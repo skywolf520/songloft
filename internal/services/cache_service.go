@@ -29,9 +29,17 @@ type CacheStats struct {
 	MaxSize   int64 `json:"max_size"`   // 最大缓存大小（字节），0 表示无限制
 }
 
-// CacheConfig 缓存配置
+// CacheConfig 缓存配置（持久化到 configs 表）
 type CacheConfig struct {
-	MaxSize int64 `json:"max_size"` // 最大缓存大小（字节），0 表示无限制
+	MaxSize  int64  `json:"max_size"`  // 最大缓存大小（字节），0 表示无限制
+	CacheDir string `json:"cache_dir"` // 自定义缓存目录，空字符串表示使用默认目录
+}
+
+// CacheConfigResponse 缓存配置 API 响应（含只读的默认目录信息）
+type CacheConfigResponse struct {
+	MaxSize         int64  `json:"max_size"`
+	CacheDir        string `json:"cache_dir"`
+	DefaultCacheDir string `json:"default_cache_dir"`
 }
 
 // inflightDownload 追踪正在进行的下载
@@ -42,32 +50,35 @@ type inflightDownload struct {
 
 // CacheService 音乐缓存服务
 type CacheService struct {
-	cacheDir       string
-	configService  *ConfigService
-	downloadClient *http.Client // 用于纯外链 GET（cache_service_song.downloadExternalToTemp）
-	lruIndex       map[string]time.Time
-	lruMu          sync.RWMutex
-	orchestrator   CacheSongFetcher   // 下载编排器(按 song.ID),由 app.go 注入
-	ffmpegPath     string             // ffmpeg 可执行文件路径,由 app.go 注入
-	transcodeSem   chan struct{}      // 转码串行信号量（默认 size=1），防止并发 ffmpeg 争抢 CPU
-	onDownloaded   func(songID int64) // 缓存下载完成回调,由 app.go 注入(用于触发自动转本地)
+	cacheDir        string
+	defaultCacheDir string
+	configService   *ConfigService
+	downloadClient  *http.Client // 用于纯外链 GET（cache_service_song.downloadExternalToTemp）
+	lruIndex        map[string]time.Time
+	lruMu           sync.RWMutex
+	orchestrator    CacheSongFetcher // 下载编排器(按 song.ID),由 app.go 注入
+	ffmpegPath      string           // ffmpeg 可执行文件路径,由 app.go 注入
+	transcodeSem    chan struct{}    // 转码串行信号量（默认 size=1），防止并发 ffmpeg 争抢 CPU
 }
 
 // NewCacheService 创建缓存服务
-func NewCacheService(cacheDir string, configService *ConfigService) *CacheService {
+func NewCacheService(defaultCacheDir string, configService *ConfigService) *CacheService {
 	cs := &CacheService{
-		cacheDir:      cacheDir,
-		configService: configService,
-		lruIndex:      make(map[string]time.Time),
-		transcodeSem:  make(chan struct{}, 1), // 默认只允许 1 个 ffmpeg 进程同时转码
-		// downloadClient 自动跟随重定向(默认最多 10 跳),
-		// 用于纯外链歌曲的 GET 阶段。兼容 JS 插件 /api/v1/jsplugin/.../music/url/{hash}
-		// 这类返回 302 重定向到真实 CDN URL 的端点。
+		cacheDir:        defaultCacheDir,
+		defaultCacheDir: defaultCacheDir,
+		configService:   configService,
+		lruIndex:        make(map[string]time.Time),
+		transcodeSem:    make(chan struct{}, 1),
 		downloadClient: &http.Client{
 			Timeout: 120 * time.Second,
 		},
 	}
-	// 启动时从文件系统加载 LRU 索引
+	// 启动时从 config 读取自定义缓存目录
+	var cfg CacheConfig
+	if err := configService.GetJSON(cacheConfigKey, &cfg); err == nil && cfg.CacheDir != "" {
+		cs.cacheDir = cfg.CacheDir
+		slog.Info("使用自定义缓存目录", "path", cfg.CacheDir)
+	}
 	cs.loadLRUIndex()
 	return cs
 }
@@ -339,12 +350,45 @@ func (c *CacheService) GetCacheConfig() CacheConfig {
 	return cfg
 }
 
+// GetCacheConfigResponse 获取含默认目录信息的完整缓存配置
+func (c *CacheService) GetCacheConfigResponse() CacheConfigResponse {
+	cfg := c.GetCacheConfig()
+	return CacheConfigResponse{
+		MaxSize:         cfg.MaxSize,
+		CacheDir:        cfg.CacheDir,
+		DefaultCacheDir: c.defaultCacheDir,
+	}
+}
+
 // UpdateCacheConfig 更新缓存配置
 func (c *CacheService) UpdateCacheConfig(cfg CacheConfig) error {
+	oldDir := c.cacheDir
 	if err := c.configService.SetJSON(cacheConfigKey, cfg); err != nil {
 		return fmt.Errorf("更新缓存配置失败: %w", err)
 	}
-	// 配置更新后立即检查是否需要淘汰
+
+	newDir := c.defaultCacheDir
+	if cfg.CacheDir != "" {
+		newDir = cfg.CacheDir
+	}
+	if newDir != oldDir {
+		c.setCacheDir(newDir)
+	}
+
 	go c.EvictLRU()
 	return nil
+}
+
+// setCacheDir 切换缓存目录并重建 LRU 索引
+func (c *CacheService) setCacheDir(dir string) {
+	if err := os.MkdirAll(dir, 0755); err != nil {
+		slog.Error("创建缓存目录失败", "path", dir, "error", err)
+		return
+	}
+	c.cacheDir = dir
+	c.lruMu.Lock()
+	c.lruIndex = make(map[string]time.Time)
+	c.lruMu.Unlock()
+	c.loadLRUIndex()
+	slog.Info("缓存目录已切换", "path", dir)
 }

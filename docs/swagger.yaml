@@ -4190,6 +4190,18 @@ paths:
         name: id
         required: true
         type: integer
+      - description: 目标转码格式（如 mp3、ogg），用于平台兼容性转码
+        in: query
+        name: format
+        type: string
+      - description: 目标音质码率（128/192/320），不传或不合法值表示原始音质。指定后默认转码为 mp3（除非同时指定了 format）
+        in: query
+        name: quality
+        type: string
+      - description: 传 1 时异步预热缓存/转码，立即返回 202
+        in: query
+        name: prefetch
+        type: string
       produces:
       - application/octet-stream
       responses:
@@ -4197,6 +4209,10 @@ paths:
           description: 音频文件
           schema:
             type: file
+        "202":
+          description: 预拉取已触发
+          schema:
+            type: string
         "302":
           description: 电台流重定向
           schema:
@@ -4223,6 +4239,18 @@ paths:
         name: id
         required: true
         type: integer
+      - description: 目标转码格式（如 mp3、ogg），用于平台兼容性转码
+        in: query
+        name: format
+        type: string
+      - description: 目标音质码率（128/192/320），不传或不合法值表示原始音质。指定后默认转码为 mp3（除非同时指定了 format）
+        in: query
+        name: quality
+        type: string
+      - description: 传 1 时异步预热缓存/转码，立即返回 202
+        in: query
+        name: prefetch
+        type: string
       produces:
       - application/octet-stream
       responses:
@@ -4230,6 +4258,10 @@ paths:
           description: 音频文件
           schema:
             type: file
+        "202":
+          description: 预拉取已触发
+          schema:
+            type: string
         "302":
           description: 电台流重定向
           schema:

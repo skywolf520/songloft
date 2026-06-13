@@ -63,33 +63,72 @@ func TestNeedsTranscode(t *testing.T) {
 	}
 }
 
+func TestParseBitrate(t *testing.T) {
+	tests := []struct {
+		input string
+		want  int
+	}{
+		{"128", 128},
+		{"192", 192},
+		{"320", 320},
+		{"128k", 128},
+		{"192K", 192},
+		{"320k", 320},
+		{"", 0},
+		{"0", 0},
+		{"64", 0},
+		{"256", 0},
+		{"abc", 0},
+		{" 128 ", 128},
+		{"128kk", 128},
+	}
+	for _, tt := range tests {
+		got := ParseBitrate(tt.input)
+		if got != tt.want {
+			t.Errorf("ParseBitrate(%q) = %d, want %d", tt.input, got, tt.want)
+		}
+	}
+}
+
 func TestFfmpegArgs(t *testing.T) {
 	tests := []struct {
 		format  string
+		bitrate int
 		encoder string
+		wantArg string // 第一个 qualityArg 的期望值，用于验证 CBR/VBR
 		wantErr bool
 	}{
-		{"mp3", "libmp3lame", false},
-		{"ogg", "libvorbis", false},
-		{"m4a", "aac", false},
-		{"flac", "flac", false},
-		{"wav", "pcm_s16le", false},
-		{"xyz", "", true},
+		{"mp3", 0, "libmp3lame", "-q:a", false},
+		{"mp3", 128, "libmp3lame", "-b:a", false},
+		{"mp3", 320, "libmp3lame", "-b:a", false},
+		{"ogg", 0, "libvorbis", "-q:a", false},
+		{"ogg", 192, "libvorbis", "-b:a", false},
+		{"m4a", 0, "aac", "-b:a", false},
+		{"m4a", 128, "aac", "-b:a", false},
+		{"flac", 0, "flac", "", false},
+		{"flac", 128, "flac", "", false}, // 无损格式忽略 bitrate
+		{"wav", 0, "pcm_s16le", "", false},
+		{"xyz", 0, "", "", true},
 	}
 	for _, tt := range tests {
-		enc, _, _, err := ffmpegArgs(tt.format)
+		enc, qargs, _, err := ffmpegArgs(tt.format, tt.bitrate)
 		if tt.wantErr {
 			if err == nil {
-				t.Errorf("ffmpegArgs(%q) should error", tt.format)
+				t.Errorf("ffmpegArgs(%q, %d) should error", tt.format, tt.bitrate)
 			}
 			continue
 		}
 		if err != nil {
-			t.Errorf("ffmpegArgs(%q) unexpected error: %v", tt.format, err)
+			t.Errorf("ffmpegArgs(%q, %d) unexpected error: %v", tt.format, tt.bitrate, err)
 			continue
 		}
 		if enc != tt.encoder {
-			t.Errorf("ffmpegArgs(%q) encoder = %q, want %q", tt.format, enc, tt.encoder)
+			t.Errorf("ffmpegArgs(%q, %d) encoder = %q, want %q", tt.format, tt.bitrate, enc, tt.encoder)
+		}
+		if tt.wantArg != "" {
+			if len(qargs) == 0 || qargs[0] != tt.wantArg {
+				t.Errorf("ffmpegArgs(%q, %d) qualityArgs[0] = %v, want %q", tt.format, tt.bitrate, qargs, tt.wantArg)
+			}
 		}
 	}
 }
@@ -97,24 +136,37 @@ func TestFfmpegArgs(t *testing.T) {
 func TestTranscodedFileName(t *testing.T) {
 	cs := &CacheService{cacheDir: "/tmp/test"}
 
-	// 本地歌曲（无 cacheKey）
+	// 本地歌曲（无 cacheKey），无 bitrate
 	local := &models.Song{ID: 42, Type: "local"}
-	name := cs.transcodedFileName(local, "mp3")
+	name := cs.transcodedFileName(local, "mp3", 0)
 	if name != "42.tc.mp3" {
-		t.Errorf("transcodedFileName(local) = %q, want %q", name, "42.tc.mp3")
+		t.Errorf("transcodedFileName(local, 0) = %q, want %q", name, "42.tc.mp3")
 	}
 
-	// 插件来源歌曲（有 cacheKey）
+	// 本地歌曲，有 bitrate
+	name = cs.transcodedFileName(local, "mp3", 128)
+	if name != "42.tc.128k.mp3" {
+		t.Errorf("transcodedFileName(local, 128) = %q, want %q", name, "42.tc.128k.mp3")
+	}
+
+	// 插件来源歌曲（有 cacheKey），无 bitrate
 	remote := &models.Song{
 		ID:              123,
 		Type:            "remote",
 		PluginEntryPath: "my-source",
 		DedupKey:        "platform:12345",
 	}
-	name = cs.transcodedFileName(remote, "ogg")
+	name = cs.transcodedFileName(remote, "ogg", 0)
 	expected := "123.my-source_platform_12345.tc.ogg"
 	if name != expected {
-		t.Errorf("transcodedFileName(remote) = %q, want %q", name, expected)
+		t.Errorf("transcodedFileName(remote, 0) = %q, want %q", name, expected)
+	}
+
+	// 插件来源歌曲，有 bitrate
+	name = cs.transcodedFileName(remote, "mp3", 192)
+	expected = "123.my-source_platform_12345.tc.192k.mp3"
+	if name != expected {
+		t.Errorf("transcodedFileName(remote, 192) = %q, want %q", name, expected)
 	}
 }
 
@@ -125,19 +177,19 @@ func TestFindTranscodedFile(t *testing.T) {
 	song := &models.Song{ID: 100, Type: "local", Format: "wma"}
 
 	// 不存在时应 miss
-	if _, ok := cs.FindTranscodedFile(song, "mp3"); ok {
+	if _, ok := cs.FindTranscodedFile(song, "mp3", 0); ok {
 		t.Error("FindTranscodedFile should miss when file does not exist")
 	}
 
-	// 创建转码文件
+	// 创建 format-only 转码文件
 	dir, _ := cs.getCachePath(song.ID, "")
 	os.MkdirAll(dir, 0755)
-	name := cs.transcodedFileName(song, "mp3")
+	name := cs.transcodedFileName(song, "mp3", 0)
 	path := filepath.Join(dir, name)
 	os.WriteFile(path, []byte("fake mp3"), 0644)
 
-	// 现在应该命中
-	found, ok := cs.FindTranscodedFile(song, "mp3")
+	// format-only 应命中
+	found, ok := cs.FindTranscodedFile(song, "mp3", 0)
 	if !ok {
 		t.Fatal("FindTranscodedFile should hit after creating file")
 	}
@@ -146,7 +198,31 @@ func TestFindTranscodedFile(t *testing.T) {
 	}
 
 	// 不同格式应 miss
-	if _, ok := cs.FindTranscodedFile(song, "ogg"); ok {
+	if _, ok := cs.FindTranscodedFile(song, "ogg", 0); ok {
 		t.Error("FindTranscodedFile should miss for different format")
+	}
+
+	// 带 bitrate 的应 miss（不同文件名）
+	if _, ok := cs.FindTranscodedFile(song, "mp3", 128); ok {
+		t.Error("FindTranscodedFile should miss for same format but different bitrate")
+	}
+
+	// 创建带 bitrate 的转码文件
+	name128 := cs.transcodedFileName(song, "mp3", 128)
+	path128 := filepath.Join(dir, name128)
+	os.WriteFile(path128, []byte("fake 128k mp3"), 0644)
+
+	// 带 bitrate 应命中
+	found, ok = cs.FindTranscodedFile(song, "mp3", 128)
+	if !ok {
+		t.Fatal("FindTranscodedFile should hit for bitrate file")
+	}
+	if found != path128 {
+		t.Errorf("FindTranscodedFile path = %q, want %q", found, path128)
+	}
+
+	// 不同 bitrate 应 miss
+	if _, ok := cs.FindTranscodedFile(song, "mp3", 320); ok {
+		t.Error("FindTranscodedFile should miss for different bitrate")
 	}
 }

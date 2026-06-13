@@ -21,41 +21,58 @@ func (c *CacheService) SetFFmpegPath(path string) {
 	c.ffmpegPath = path
 }
 
+// ParseBitrate 解析 quality 参数值为 kbps int。
+// 仅接受 128/192/320，支持可选的 "k"/"K" 后缀。其他值返回 0（原始音质）。
+func ParseBitrate(s string) int {
+	s = strings.TrimSpace(s)
+	s = strings.TrimRight(s, "kK")
+	n, err := strconv.Atoi(s)
+	if err != nil {
+		return 0
+	}
+	switch n {
+	case 128, 192, 320:
+		return n
+	default:
+		return 0
+	}
+}
+
 // GetOrTranscode 获取转码后的文件路径。
-//  1. 原格式==目标格式 → 返回 srcPath
+//  1. 原格式==目标格式 且 bitrate==0 → 返回 srcPath
 //  2. 转码缓存命中 → 返回缓存路径
 //  3. miss → ffmpeg 转码 → 写入缓存 → 返回
 //
 // srcPath 是原始音频文件路径（本地文件路径或已下载的缓存文件路径）。
 // targetFormat 是标准化后的格式名（mp3/ogg/m4a/flac/wav）。
-func (c *CacheService) GetOrTranscode(ctx context.Context, srcPath string, song *models.Song, targetFormat string) (string, error) {
+// bitrate 为目标码率（kbps），0 表示使用默认最高质量。
+func (c *CacheService) GetOrTranscode(ctx context.Context, srcPath string, song *models.Song, targetFormat string, bitrate int) (string, error) {
 	if song == nil {
 		return "", errors.New("song is nil")
 	}
 	srcFmt := EffectiveSourceFormat(song, srcPath)
-	if !NeedsTranscode(srcFmt, targetFormat) {
+	needsTranscode := NeedsTranscode(srcFmt, targetFormat) || bitrate > 0
+	if !needsTranscode {
 		slog.Debug("transcode skipped: same format",
 			"songId", song.ID, "songFormat", song.Format,
-			"srcFmt", srcFmt, "targetFormat", targetFormat, "srcPath", srcPath)
+			"srcFmt", srcFmt, "targetFormat", targetFormat, "bitrate", bitrate, "srcPath", srcPath)
 		return srcPath, nil
 	}
 	slog.Info("transcode needed",
 		"songId", song.ID, "songFormat", song.Format,
-		"srcFmt", srcFmt, "targetFormat", targetFormat, "srcPath", srcPath)
+		"srcFmt", srcFmt, "targetFormat", targetFormat, "bitrate", bitrate, "srcPath", srcPath)
 
 	// 1. 缓存命中
-	if p, ok := c.FindTranscodedFile(song, targetFormat); ok {
+	if p, ok := c.FindTranscodedFile(song, targetFormat, bitrate); ok {
 		return p, nil
 	}
 
 	// 2. inflight 去重
-	inflightKey := fmt.Sprintf("tc_%d_%s", song.ID, targetFormat)
+	inflightKey := fmt.Sprintf("tc_%d_%s_%d", song.ID, targetFormat, bitrate)
 	state := getSongState()
 	state.transcodeInflightMu.Lock()
 	if dl, ok := state.transcodeInflight[inflightKey]; ok {
 		state.transcodeInflightMu.Unlock()
-		// 等待首转码完成；同时监听本等待者自己的 ctx，防止首转码卡住时
-		// 后续等待者也被拖死（issue #79 残留点）。
 		select {
 		case <-dl.done:
 		case <-ctx.Done():
@@ -64,7 +81,7 @@ func (c *CacheService) GetOrTranscode(ctx context.Context, srcPath string, song 
 		if dl.err != nil {
 			return "", dl.err
 		}
-		if p, ok := c.FindTranscodedFile(song, targetFormat); ok {
+		if p, ok := c.FindTranscodedFile(song, targetFormat, bitrate); ok {
 			return p, nil
 		}
 		return "", fmt.Errorf("transcoded file not found after wait")
@@ -80,7 +97,7 @@ func (c *CacheService) GetOrTranscode(ctx context.Context, srcPath string, song 
 	}()
 
 	// 3. 转码
-	finalPath, err := c.doTranscode(ctx, srcPath, song, targetFormat)
+	finalPath, err := c.doTranscode(ctx, srcPath, song, targetFormat, bitrate)
 	if err != nil {
 		dl.err = err
 		return "", err
@@ -92,12 +109,12 @@ func (c *CacheService) GetOrTranscode(ctx context.Context, srcPath string, song 
 }
 
 // FindTranscodedFile 查找已转码的缓存文件。
-// 文件名形如 "{id}.{key}.tc.{format}" 或 "{id}.tc.{format}"。
-func (c *CacheService) FindTranscodedFile(song *models.Song, targetFormat string) (string, bool) {
+// 文件名形如 "{id}.{key}.tc.{format}"、"{id}.tc.{format}" 或含码率的 "{id}.tc.{N}k.{format}"。
+func (c *CacheService) FindTranscodedFile(song *models.Song, targetFormat string, bitrate int) (string, bool) {
 	if song == nil {
 		return "", false
 	}
-	name := c.transcodedFileName(song, targetFormat)
+	name := c.transcodedFileName(song, targetFormat, bitrate)
 	dir, _ := c.getCachePath(song.ID, "")
 	path := filepath.Join(dir, name)
 	if _, err := os.Stat(path); err == nil {
@@ -108,7 +125,7 @@ func (c *CacheService) FindTranscodedFile(song *models.Song, targetFormat string
 }
 
 // doTranscode 执行 ffmpeg 转码并写入缓存。
-func (c *CacheService) doTranscode(ctx context.Context, srcPath string, song *models.Song, targetFormat string) (string, error) {
+func (c *CacheService) doTranscode(ctx context.Context, srcPath string, song *models.Song, targetFormat string, bitrate int) (string, error) {
 	dir, _ := c.getCachePath(song.ID, "")
 	if err := os.MkdirAll(dir, 0755); err != nil {
 		return "", fmt.Errorf("mkdir transcode cache dir: %w", err)
@@ -122,12 +139,12 @@ func (c *CacheService) doTranscode(ctx context.Context, srcPath string, song *mo
 	tmpPath := tmp.Name()
 	tmp.Close()
 
-	if err := c.runFFmpeg(ctx, srcPath, tmpPath, targetFormat); err != nil {
+	if err := c.runFFmpeg(ctx, srcPath, tmpPath, targetFormat, bitrate); err != nil {
 		os.Remove(tmpPath)
 		return "", fmt.Errorf("ffmpeg transcode: %w", err)
 	}
 
-	finalName := c.transcodedFileName(song, targetFormat)
+	finalName := c.transcodedFileName(song, targetFormat, bitrate)
 	finalPath := filepath.Join(dir, finalName)
 	if _, err := os.Stat(finalPath); err == nil {
 		os.Remove(finalPath)
@@ -137,13 +154,13 @@ func (c *CacheService) doTranscode(ctx context.Context, srcPath string, song *mo
 		return "", fmt.Errorf("rename transcoded file: %w", err)
 	}
 
-	slog.Info("transcode completed", "songId", song.ID, "format", targetFormat, "path", finalPath)
+	slog.Info("transcode completed", "songId", song.ID, "format", targetFormat, "bitrate", bitrate, "path", finalPath)
 	return finalPath, nil
 }
 
 // runFFmpeg 调用 ffmpeg 执行转码。
-func (c *CacheService) runFFmpeg(ctx context.Context, srcPath, dstPath, targetFormat string) error {
-	encoder, qualityArgs, muxer, err := ffmpegArgs(targetFormat)
+func (c *CacheService) runFFmpeg(ctx context.Context, srcPath, dstPath, targetFormat string, bitrate int) error {
+	encoder, qualityArgs, muxer, err := ffmpegArgs(targetFormat, bitrate)
 	if err != nil {
 		return err
 	}
@@ -177,13 +194,20 @@ func (c *CacheService) runFFmpeg(ctx context.Context, srcPath, dstPath, targetFo
 }
 
 // transcodedFileName 生成转码缓存文件名。
-func (c *CacheService) transcodedFileName(song *models.Song, targetFormat string) string {
+// bitrate > 0 时文件名含码率标记，如 "42.tc.128k.mp3"。
+func (c *CacheService) transcodedFileName(song *models.Song, targetFormat string, bitrate int) string {
 	idStr := strconv.FormatInt(song.ID, 10)
 	key := cacheKeyOf(song)
+	var base string
 	if key != "" {
-		return idStr + "." + key + ".tc." + targetFormat
+		base = idStr + "." + key + ".tc."
+	} else {
+		base = idStr + ".tc."
 	}
-	return idStr + ".tc." + targetFormat
+	if bitrate > 0 {
+		return base + strconv.Itoa(bitrate) + "k." + targetFormat
+	}
+	return base + targetFormat
 }
 
 // NeedsTranscode 判断是否需要转码。
@@ -250,14 +274,26 @@ func NormalizeFormat(f string) string {
 	return f
 }
 
-// ffmpegArgs 根据目标格式返回 ffmpeg 编码器、质量参数和 muxer 格式名。
-func ffmpegArgs(targetFormat string) (encoder string, qualityArgs []string, muxer string, err error) {
+// ffmpegArgs 根据目标格式和码率返回 ffmpeg 编码器、质量参数和 muxer 格式名。
+// bitrate > 0 时有损格式使用 CBR（-b:a Nk），bitrate == 0 时使用默认 VBR 最高质量。
+// 无损格式（flac/wav）忽略 bitrate。
+func ffmpegArgs(targetFormat string, bitrate int) (encoder string, qualityArgs []string, muxer string, err error) {
+	bitrateArg := strconv.Itoa(bitrate) + "k"
 	switch NormalizeFormat(targetFormat) {
 	case "mp3":
+		if bitrate > 0 {
+			return "libmp3lame", []string{"-b:a", bitrateArg}, "mp3", nil
+		}
 		return "libmp3lame", []string{"-q:a", "0"}, "mp3", nil
 	case "ogg":
+		if bitrate > 0 {
+			return "libvorbis", []string{"-b:a", bitrateArg}, "ogg", nil
+		}
 		return "libvorbis", []string{"-q:a", "6"}, "ogg", nil
 	case "m4a":
+		if bitrate > 0 {
+			return "aac", []string{"-b:a", bitrateArg}, "ipod", nil
+		}
 		return "aac", []string{"-b:a", "256k"}, "ipod", nil
 	case "flac":
 		return "flac", nil, "flac", nil

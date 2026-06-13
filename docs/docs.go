@@ -5409,6 +5409,24 @@ const docTemplate = `{
                         "name": "id",
                         "in": "path",
                         "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "目标转码格式（如 mp3、ogg），用于平台兼容性转码",
+                        "name": "format",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "目标音质码率（128/192/320），不传或不合法值表示原始音质。指定后默认转码为 mp3（除非同时指定了 format）",
+                        "name": "quality",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "传 1 时异步预热缓存/转码，立即返回 202",
+                        "name": "prefetch",
+                        "in": "query"
                     }
                 ],
                 "responses": {
@@ -5416,6 +5434,12 @@ const docTemplate = `{
                         "description": "音频文件",
                         "schema": {
                             "type": "file"
+                        }
+                    },
+                    "202": {
+                        "description": "预拉取已触发",
+                        "schema": {
+                            "type": "string"
                         }
                     },
                     "302": {
@@ -5461,6 +5485,24 @@ const docTemplate = `{
                         "name": "id",
                         "in": "path",
                         "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "目标转码格式（如 mp3、ogg），用于平台兼容性转码",
+                        "name": "format",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "目标音质码率（128/192/320），不传或不合法值表示原始音质。指定后默认转码为 mp3（除非同时指定了 format）",
+                        "name": "quality",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "传 1 时异步预热缓存/转码，立即返回 202",
+                        "name": "prefetch",
+                        "in": "query"
                     }
                 ],
                 "responses": {
@@ -5468,6 +5510,12 @@ const docTemplate = `{
                         "description": "音频文件",
                         "schema": {
                             "type": "file"
+                        }
+                    },
+                    "202": {
+                        "description": "预拉取已触发",
+                        "schema": {
+                            "type": "string"
                         }
                     },
                     "302": {

@@ -922,7 +922,10 @@ func (m *JSEnvManager) HealthProbe(envID string) ProbeStatus {
 
 	// 设置一个很短的 eval 超时，VM 真死的话 1ms 都跑不出来；
 	// 默认的 30s 超时会让 health probe 在罕见死循环场景下被卡住。
+	// 探针完成后必须恢复默认超时，否则 ProcessTimers 会继承这个短超时，
+	// 导致定时器驱动的长链操作（如语音指令搜索歌曲）被误中断。
 	env.vm.SetEvalTimeout(500 * time.Millisecond)
+	defer env.vm.SetEvalTimeout(defaultJSTimeout)
 
 	val, err := env.vm.EvalValue("1+1", quickjs.EvalGlobal)
 	if err != nil {
@@ -1152,6 +1155,7 @@ func (m *JSEnvManager) ProcessTimers(envID string) bool {
 	defer env.mu.Unlock()
 
 	vm := env.vm
+	vm.SetEvalTimeout(defaultJSTimeout)
 	didAnyTimerFire := false
 
 	// 单轮 pump→jobs→timers，做几次让 fetch().then(setTimeout(...)) 这种链

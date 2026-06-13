@@ -37,6 +37,15 @@ type PlaylistFilter struct {
 	Order   string
 }
 
+// PlaylistSongFilter 歌单歌曲过滤/排序条件
+type PlaylistSongFilter struct {
+	Keyword string
+	OrderBy string
+	Order   string
+	Limit   int
+	Offset  int
+}
+
 // TokenFilter Token 过滤条件
 type TokenFilter struct {
 	TokenType string
@@ -65,6 +74,19 @@ var (
 	tokenOrderWhitelist = map[string]struct{}{
 		"id": {}, "token_type": {}, "expires_at": {}, "created_at": {},
 	}
+	playlistSongOrderWhitelist = map[string]struct{}{
+		"position": {}, "added_at": {}, "title": {},
+		"artist": {}, "album": {}, "duration": {}, "updated_at": {},
+	}
+	playlistSongOrderColumn = map[string]string{
+		"position":   "ps.position",
+		"added_at":   "ps.added_at",
+		"title":      "s.title",
+		"artist":     "s.artist",
+		"album":      "s.album",
+		"duration":   "s.duration",
+		"updated_at": "s.updated_at",
+	}
 )
 
 // applyOrder 把 orderBy/order 加到 squirrel SELECT 上。
@@ -82,6 +104,22 @@ func applyOrder(sb sq.SelectBuilder, orderBy, order, defaultOrder string, whitel
 		dir = "DESC"
 	}
 	return sb.OrderBy(tablePrefix + orderBy + " " + dir)
+}
+
+// applyPlaylistSongOrder 对歌单歌曲查询应用排序。
+// 与 applyOrder 不同，使用列名映射表将用户传入的字段名转换为带表别名的列名。
+func applyPlaylistSongOrder(sb sq.SelectBuilder, orderBy, order string) sq.SelectBuilder {
+	col := "ps.position"
+	if orderBy != "" {
+		if mapped, ok := playlistSongOrderColumn[orderBy]; ok {
+			col = mapped
+		}
+	}
+	dir := "ASC"
+	if strings.EqualFold(order, "DESC") {
+		dir = "DESC"
+	}
+	return sb.OrderBy(col + " " + dir)
 }
 
 // applyPagination 把 limit/offset 加到 squirrel SELECT 上。limit<=0 视为不分页。

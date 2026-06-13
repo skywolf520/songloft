@@ -292,7 +292,7 @@ func TestPlaylistServiceGetSongs(t *testing.T) {
 		t.Fatalf("Create() error = %v", err)
 	}
 
-	songs, err := service.GetSongs(ctx, playlist.ID, 20, 0)
+	songs, err := service.GetSongs(ctx, playlist.ID, database.PlaylistSongFilter{Limit: 20})
 	if err != nil {
 		t.Fatalf("GetSongs() error = %v", err)
 	}
@@ -453,7 +453,7 @@ func TestPlaylistServiceAddSongsBatch(t *testing.T) {
 	}
 
 	// 验证 position 连续递增（从 1 起，无空缺）。
-	songs, err := service.GetSongs(ctx, playlist.ID, 100, 0)
+	songs, err := service.GetSongs(ctx, playlist.ID, database.PlaylistSongFilter{Limit: 100})
 	if err != nil {
 		t.Fatalf("GetSongs() error = %v", err)
 	}

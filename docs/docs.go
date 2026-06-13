@@ -2797,7 +2797,7 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
-                "description": "获取指定歌单中的歌曲，支持分页",
+                "description": "获取指定歌单中的歌曲，支持分页、排序和搜索",
                 "consumes": [
                     "application/json"
                 ],
@@ -2828,6 +2828,24 @@ const docTemplate = `{
                         "default": 0,
                         "description": "偏移量",
                         "name": "offset",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "排序字段: position(默认)/added_at/title/artist/album/duration/updated_at",
+                        "name": "sort",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "排序方向: asc(默认)/desc",
+                        "name": "order",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "搜索关键词（匹配标题/艺术家/专辑）",
+                        "name": "keyword",
                         "in": "query"
                     }
                 ],

@@ -28,7 +28,9 @@ type PlaylistSongRepository interface {
 	RemoveSong(ctx context.Context, playlistID, songID int64) error
 	GetSongs(ctx context.Context, playlistID int64) ([]*models.Song, error)
 	GetSongsPaginated(ctx context.Context, playlistID int64, limit, offset int) ([]*models.Song, error)
+	GetSongsFiltered(ctx context.Context, playlistID int64, filter database.PlaylistSongFilter) ([]*models.Song, error)
 	CountSongs(ctx context.Context, playlistID int64) (int, error)
+	CountSongsFiltered(ctx context.Context, playlistID int64, keyword string) (int, error)
 	BatchUpdatePositions(ctx context.Context, playlistID int64, songIDs []int64) error
 	MaxPosition(ctx context.Context, playlistID int64) (int, error)
 	AddSongsBatch(ctx context.Context, playlistID int64, startPos int, songIDs []int64) (added int, skipped int, err error)
@@ -263,17 +265,24 @@ func (s *PlaylistService) RemoveSong(ctx context.Context, playlistID, songID int
 	return nil
 }
 
-// GetSongs 获取歌单中的歌曲（支持分页）
-func (s *PlaylistService) GetSongs(ctx context.Context, playlistID int64, limit, offset int) ([]*models.Song, error) {
-	songs, err := s.playlistSongs.GetSongsPaginated(ctx, playlistID, limit, offset)
+// GetSongs 获取歌单中的歌曲（支持分页、排序、搜索）
+func (s *PlaylistService) GetSongs(ctx context.Context, playlistID int64, filter database.PlaylistSongFilter) ([]*models.Song, error) {
+	songs, err := s.playlistSongs.GetSongsFiltered(ctx, playlistID, filter)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get playlist songs: %w", err)
 	}
 	return songs, nil
 }
 
-// CountSongs 统计歌单中的歌曲总数
-func (s *PlaylistService) CountSongs(ctx context.Context, playlistID int64) (int, error) {
+// CountSongs 统计歌单中满足过滤条件的歌曲总数
+func (s *PlaylistService) CountSongs(ctx context.Context, playlistID int64, keyword string) (int, error) {
+	if keyword != "" {
+		count, err := s.playlistSongs.CountSongsFiltered(ctx, playlistID, keyword)
+		if err != nil {
+			return 0, fmt.Errorf("failed to count playlist songs: %w", err)
+		}
+		return count, nil
+	}
 	count, err := s.playlistSongs.CountSongs(ctx, playlistID)
 	if err != nil {
 		return 0, fmt.Errorf("failed to count playlist songs: %w", err)

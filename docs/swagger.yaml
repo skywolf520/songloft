@@ -2623,7 +2623,7 @@ paths:
     get:
       consumes:
       - application/json
-      description: 获取指定歌单中的歌曲，支持分页
+      description: 获取指定歌单中的歌曲，支持分页、排序和搜索
       parameters:
       - description: 歌单 ID
         in: path
@@ -2640,6 +2640,18 @@ paths:
         in: query
         name: offset
         type: integer
+      - description: '排序字段: position(默认)/added_at/title/artist/album/duration/updated_at'
+        in: query
+        name: sort
+        type: string
+      - description: '排序方向: asc(默认)/desc'
+        in: query
+        name: order
+        type: string
+      - description: 搜索关键词（匹配标题/艺术家/专辑）
+        in: query
+        name: keyword
+        type: string
       produces:
       - application/json
       responses:

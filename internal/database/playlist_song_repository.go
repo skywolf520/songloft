@@ -6,6 +6,8 @@ import (
 	"errors"
 	"fmt"
 
+	sq "github.com/Masterminds/squirrel"
+
 	"songloft/internal/database/sqlc"
 	"songloft/internal/models"
 )
@@ -85,6 +87,87 @@ func (r *PlaylistSongRepository) CountSongs(ctx context.Context, playlistID int6
 		return 0, fmt.Errorf("count playlist songs: %w", err)
 	}
 	return int(count), nil
+}
+
+// GetSongsFiltered 按过滤条件分页返回歌单内的歌曲（支持搜索和排序）。
+func (r *PlaylistSongRepository) GetSongsFiltered(ctx context.Context, playlistID int64, filter PlaylistSongFilter) ([]*models.Song, error) {
+	sb := sq.Select(
+		"s.id", "s.type", "s.title", "s.artist", "s.album", "s.duration",
+		"s.file_path", "s.url", "s.cover_path", "s.cover_url",
+		"s.lyric", "s.lyric_source", "s.lyric_remote_url", "s.file_size",
+		"s.format", "s.bit_rate", "s.sample_rate", "s.is_live",
+		"COALESCE(s.plugin_entry_path, '')",
+		"COALESCE(s.source_data, '')",
+		"COALESCE(s.dedup_key, '')",
+		"s.added_at", "s.updated_at",
+		"s.year", "s.genre",
+		"s.fingerprint", "s.fingerprint_duration",
+		"s.isrc",
+	).From("songs s").
+		InnerJoin("playlist_songs ps ON s.id = ps.song_id").
+		Where(sq.Eq{"ps.playlist_id": playlistID})
+
+	if filter.Keyword != "" {
+		kw := "%" + filter.Keyword + "%"
+		sb = sb.Where(sq.Or{
+			sq.Like{"s.title": kw},
+			sq.Like{"s.artist": kw},
+			sq.Like{"s.album": kw},
+		})
+	}
+
+	sb = applyPlaylistSongOrder(sb, filter.OrderBy, filter.Order)
+	sb = applyPagination(sb, filter.Limit, filter.Offset)
+
+	query, args, err := sb.ToSql()
+	if err != nil {
+		return nil, fmt.Errorf("build playlist songs sql: %w", err)
+	}
+	rows, err := r.db.QueryContext(ctx, query, args...)
+	if err != nil {
+		return nil, fmt.Errorf("get playlist songs filtered: %w", err)
+	}
+	defer rows.Close()
+
+	songs := []*models.Song{}
+	for rows.Next() {
+		s, err := scanSongRow(rows)
+		if err != nil {
+			return nil, err
+		}
+		songs = append(songs, s)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate playlist songs: %w", err)
+	}
+	return songs, nil
+}
+
+// CountSongsFiltered 返回歌单内满足过滤条件的歌曲总数。
+func (r *PlaylistSongRepository) CountSongsFiltered(ctx context.Context, playlistID int64, keyword string) (int, error) {
+	sb := sq.Select("COUNT(*)").
+		From("playlist_songs ps").
+		InnerJoin("songs s ON s.id = ps.song_id").
+		Where(sq.Eq{"ps.playlist_id": playlistID})
+
+	if keyword != "" {
+		kw := "%" + keyword + "%"
+		sb = sb.Where(sq.Or{
+			sq.Like{"s.title": kw},
+			sq.Like{"s.artist": kw},
+			sq.Like{"s.album": kw},
+		})
+	}
+
+	query, args, err := sb.ToSql()
+	if err != nil {
+		return 0, fmt.Errorf("build count playlist songs sql: %w", err)
+	}
+	var count int
+	if err := r.db.QueryRowContext(ctx, query, args...).Scan(&count); err != nil {
+		return 0, fmt.Errorf("count playlist songs filtered: %w", err)
+	}
+	return count, nil
 }
 
 // ListPlaylistsContainingSong 返回包含给定歌曲的所有 normal 歌单 ID。

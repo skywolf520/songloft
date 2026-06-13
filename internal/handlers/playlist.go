@@ -322,13 +322,16 @@ func (h *PlaylistHandler) BatchDeletePlaylists(w http.ResponseWriter, r *http.Re
 
 // GetPlaylistSongs 获取歌单中的歌曲
 // @Summary 获取歌单中的歌曲
-// @Description 获取指定歌单中的歌曲，支持分页
+// @Description 获取指定歌单中的歌曲，支持分页、排序和搜索
 // @Tags 歌单管理
 // @Accept json
 // @Produce json
 // @Param id path int true "歌单 ID"
 // @Param limit query int false "每页数量" default(20)
 // @Param offset query int false "偏移量" default(0)
+// @Param sort query string false "排序字段: position(默认)/added_at/title/artist/album/duration/updated_at"
+// @Param order query string false "排序方向: asc(默认)/desc"
+// @Param keyword query string false "搜索关键词（匹配标题/艺术家/专辑）"
 // @Success 200 {object} map[string]interface{} "成功返回歌曲列表"
 // @Failure 400 {object} map[string]string "无效的歌单 ID"
 // @Failure 500 {object} map[string]string "获取失败"
@@ -344,34 +347,37 @@ func (h *PlaylistHandler) GetPlaylistSongs(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	// 解析分页参数
-	limitStr := r.URL.Query().Get("limit")
-	offsetStr := r.URL.Query().Get("offset")
+	q := r.URL.Query()
 
 	limit := models.DefaultPaginationLimit
 	offset := 0
 
-	if limitStr != "" {
+	if limitStr := q.Get("limit"); limitStr != "" {
 		if l, err := strconv.Atoi(limitStr); err == nil {
 			limit = l
 		}
 	}
-
-	if offsetStr != "" {
+	if offsetStr := q.Get("offset"); offsetStr != "" {
 		if o, err := strconv.Atoi(offsetStr); err == nil {
 			offset = o
 		}
 	}
 
-	// 获取歌曲列表
-	songs, err := h.playlistService.GetSongs(ctx, id, limit, offset)
+	filter := database.PlaylistSongFilter{
+		Keyword: q.Get("keyword"),
+		OrderBy: q.Get("sort"),
+		Order:   q.Get("order"),
+		Limit:   limit,
+		Offset:  offset,
+	}
+
+	songs, err := h.playlistService.GetSongs(ctx, id, filter)
 	if err != nil {
 		respondError(w, http.StatusInternalServerError, "获取歌单歌曲失败", err)
 		return
 	}
 
-	// 获取歌曲总数
-	total, err := h.playlistService.CountSongs(ctx, id)
+	total, err := h.playlistService.CountSongs(ctx, id, filter.Keyword)
 	if err != nil {
 		respondError(w, http.StatusInternalServerError, "获取歌曲总数失败", err)
 		return
@@ -663,7 +669,7 @@ func (h *PlaylistHandler) GetPlaylistCover(w http.ResponseWriter, r *http.Reques
 
 	// 回退：取歌单内第一首有本地封面的歌曲
 	const coverFallbackLimit = 20
-	songs, err := h.playlistService.GetSongs(r.Context(), id, coverFallbackLimit, 0)
+	songs, err := h.playlistService.GetSongs(r.Context(), id, database.PlaylistSongFilter{Limit: coverFallbackLimit})
 	if err == nil {
 		for _, s := range songs {
 			if s.CoverPath != "" {

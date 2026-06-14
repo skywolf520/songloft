@@ -1,0 +1,52 @@
+name: 使用问题 / 咨询
+description: 遇到使用上的疑问或需要帮助
+labels: ["FAQ"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        遇到问题了？没关系，我们来帮你排查。
+        提交前建议先搜索 [已有 issue](https://github.com/songloft-org/songloft/issues?q=is%3Aissue)，也许已经有了答案。
+
+  - type: textarea
+    id: description
+    attributes:
+      label: 问题描述
+      description: 描述你遇到的问题或疑问
+    validations:
+      required: true
+
+  - type: input
+    id: version
+    attributes:
+      label: Songloft 版本
+      placeholder: 例如 1.2.0
+    validations:
+      required: true
+
+  - type: dropdown
+    id: deploy
+    attributes:
+      label: 部署方式
+      options:
+        - Docker
+        - 二进制直接运行
+        - 其他
+    validations:
+      required: true
+
+  - type: textarea
+    id: tried
+    attributes:
+      label: 已尝试的解决方法
+      description: 你为了解决这个问题已经做了哪些尝试？
+    validations:
+      required: false
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: 日志 / 截图
+      description: 如有相关日志或截图，请粘贴在此
+    validations:
+      required: false

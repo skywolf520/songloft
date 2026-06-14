@@ -1,0 +1,73 @@
+name: 插件相关问题
+description: 报告 JS 插件的 Bug、建议或使用问题
+labels: ["插件"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        请提供插件的详细信息，以便我们快速定位问题。
+
+  - type: input
+    id: plugin-name
+    attributes:
+      label: 插件名称
+      description: 出问题的插件名称
+      placeholder: 例如 songloft-plugin-miot
+    validations:
+      required: true
+
+  - type: input
+    id: plugin-version
+    attributes:
+      label: 插件版本
+      description: 可在插件管理页面查看
+      placeholder: 例如 1.0.3
+    validations:
+      required: true
+
+  - type: input
+    id: songloft-version
+    attributes:
+      label: Songloft 版本
+      placeholder: 例如 1.2.0
+    validations:
+      required: true
+
+  - type: dropdown
+    id: issue-type
+    attributes:
+      label: 问题类型
+      options:
+        - Bug
+        - 功能建议
+        - 使用咨询
+    validations:
+      required: true
+
+  - type: textarea
+    id: description
+    attributes:
+      label: 问题描述
+      description: 清晰描述遇到的问题或你的建议
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: 复现步骤（Bug 时必填）
+      description: 如果是 Bug，请提供复现步骤
+      placeholder: |
+        1. 安装插件 ...
+        2. 配置 ...
+        3. 触发 ...
+    validations:
+      required: false
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: 日志 / 截图
+      description: 如有相关日志或截图，请粘贴在此
+    validations:
+      required: false

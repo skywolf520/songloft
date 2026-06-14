@@ -35,6 +35,7 @@ type SongDownloader struct {
 	cacheService   *CacheService
 	configService  *ConfigService
 	getMusicPath   func() string
+	lyricFetcher   *LyricFetcher
 	downloadClient *http.Client
 }
 
@@ -44,12 +45,14 @@ func NewSongDownloader(
 	cacheService *CacheService,
 	configService *ConfigService,
 	getMusicPath func() string,
+	lyricFetcher *LyricFetcher,
 ) *SongDownloader {
 	return &SongDownloader{
 		songService:   songService,
 		cacheService:  cacheService,
 		configService: configService,
 		getMusicPath:  getMusicPath,
+		lyricFetcher:  lyricFetcher,
 		downloadClient: &http.Client{
 			Timeout: 120 * time.Second,
 		},
@@ -107,6 +110,19 @@ func (d *SongDownloader) Download(ctx context.Context, songID int64, opts SongDo
 	}
 
 	if opts.EmbedMetadata {
+		// URL 歌词：下载时拉取并写入文件，同时缓存到 DB
+		if song.LyricSource == models.LyricSourceURL && song.LyricRemoteURL != "" && d.lyricFetcher != nil {
+			payload, err := d.lyricFetcher.Fetch(ctx, song.LyricRemoteURL)
+			if err != nil {
+				slog.Warn("download: fetch url lyrics failed, skipping",
+					"songId", songID, "url", song.LyricRemoteURL, "error", err)
+			} else if payload.Lyric != "" {
+				song.Lyric = payload.MarshalString()
+				song.LyricSource = models.LyricSourceEmbedded
+				song.LyricRemoteURL = ""
+			}
+		}
+
 		status := WriteCacheSongTags(destPath, song, d.downloadClient)
 		slog.Debug("download: metadata embed", "songId", songID, "status", status)
 	}

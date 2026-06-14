@@ -289,7 +289,7 @@ func (a *App) Init() error {
 	a.jsPluginManager.SetAuthService(a.authService, a.config.Port)
 
 	// 创建歌曲下载服务并注入到 JS 插件管理器（bridge songs.download 调用）
-	songDownloader := services.NewSongDownloader(a.songService, a.cacheService, a.configService, a.scanner.GetMusicPath)
+	songDownloader := services.NewSongDownloader(a.songService, a.cacheService, a.configService, a.scanner.GetMusicPath, a.lyricFetcher)
 	a.jsPluginManager.SetSongDownloader(songDownloader)
 
 	// 装配音源处理链:Fetcher → Resolver → Orchestrator

@@ -1,3 +1,22 @@
+## [v2.8.3] - 2026-06-15
+### :sparkles: New Features
+- [`00763f2`](https://github.com/songloft-org/songloft/commit/00763f26c7096888d911287d23f9d5842e9bdd52) - 下载歌曲时拉取 URL 歌词写入文件，实现 MP4/OGG 元数据写入 *(commit by [@hanxi](https://github.com/hanxi))*
+- [`7f98bae`](https://github.com/songloft-org/songloft/commit/7f98bae3f7ef7bc921abe17a402156749f8c75d2) - APE 封面读写支持，更新 tag 写入文档 *(commit by [@hanxi](https://github.com/hanxi))*
+
+### :bug: Bug Fixes
+- [`80d6a8f`](https://github.com/songloft-org/songloft/commit/80d6a8fe48d0764f08028819e81dfa635c63d015) - **player**: 低码率音质下播放按钮需按两次才能播放 (close [#170](https://github.com/songloft-org/songloft/pull/170)) *(commit by [@hanxi](https://github.com/hanxi))*
+- [`fc03e78`](https://github.com/songloft-org/songloft/commit/fc03e78fdbef5b8f50002846ba9b6ca0c3fa3b03) - **player**: 所有播放来源广播 onPlayEvent 事件 (close [#173](https://github.com/songloft-org/songloft/pull/173)) *(commit by [@hanxi](https://github.com/hanxi))*
+- [`69554eb`](https://github.com/songloft-org/songloft/commit/69554eb7c59168b6b46024fb9fb07c48631bc6fb) - **player**: 歌词加载后立即推送到灵动岛 (close [#98](https://github.com/songloft-org/songloft/pull/98)) *(commit by [@hanxi](https://github.com/hanxi))*
+
+### :memo: Documentation Changes
+- [`8cf69a9`](https://github.com/songloft-org/songloft/commit/8cf69a9fbd9b7ecf5b428d45fa3dcfe9f1dee477) - update CHANGELOG for v2.8.2 *(commit by [@github-actions[bot]](https://github.com/apps/github-actions))*
+- [`e7d1341`](https://github.com/songloft-org/songloft/commit/e7d13412039d6b5a559f83daad46565d7440c3bd) - 添加 Issue 模板和模板选择器配置 *(commit by [@hanxi](https://github.com/hanxi))*
+- [`f2e6777`](https://github.com/songloft-org/songloft/commit/f2e677767ed391f35911e9cb7a4c9e3e3e36536a) - 移除网络歌曲转本地功能宣传，downloader 插件定位为示例 *(commit by [@hanxi](https://github.com/hanxi))*
+
+### :wrench: Chores
+- [`0fc38f5`](https://github.com/songloft-org/songloft/commit/0fc38f53fb7b5296475eb8391ac0322bee03d408) - release version 2.8.3 *(commit by [@hanxi](https://github.com/hanxi))*
+
+
 ## [v2.8.2] - 2026-06-13
 ### :sparkles: New Features
 - [`feb75bb`](https://github.com/songloft-org/songloft/commit/feb75bb142b1ef2ec5c0e4d5f822b392a5c3f060) - **jsplugin**: add onPlayEvent callback for play event subscription (close [#164](https://github.com/songloft-org/songloft/pull/164)) *(commit by [@hanxi](https://github.com/hanxi))*
@@ -1277,3 +1296,4 @@
 [v2.8.0]: https://github.com/songloft-org/songloft/compare/v2.7.0...v2.8.0
 [v2.8.1]: https://github.com/songloft-org/songloft/compare/v2.8.0...v2.8.1
 [v2.8.2]: https://github.com/songloft-org/songloft/compare/v2.8.1...v2.8.2
+[v2.8.3]: https://github.com/songloft-org/songloft/compare/v2.8.2...v2.8.3

@@ -539,6 +539,11 @@ globalThis.URLSearchParams = function(init) {
                                               decodeURIComponent(pairs[i].substring(idx+1))]);
             else this._params.push([decodeURIComponent(pairs[i]), '']);
         }
+    } else if (init && typeof init === 'object') {
+        var keys = Object.keys(init);
+        for (var i = 0; i < keys.length; i++) {
+            this._params.push([keys[i], String(init[keys[i]])]);
+        }
     }
 };
 globalThis.URLSearchParams.prototype.get = function(name) {

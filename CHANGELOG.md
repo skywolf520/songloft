@@ -1,3 +1,21 @@
+## [v2.8.7] - 2026-06-20
+### :sparkles: New Features
+- [`5e79cdc`](https://github.com/songloft-org/songloft/commit/5e79cdcc41d244d7fa807a6d2497138f083f25b0) - **settings**: 用户偏好跨设备同步 *(PR [#196](https://github.com/songloft-org/songloft/pull/196) by [@hanxi](https://github.com/hanxi))*
+- [`66748b0`](https://github.com/songloft-org/songloft/commit/66748b06f57afdeaeaa6d546b3556194a8dcaeaa) - **metadata**: 扩展远程歌曲元数据刷新 *(PR [#195](https://github.com/songloft-org/songloft/pull/195) by [@hanxi](https://github.com/hanxi))*
+
+### :bug: Bug Fixes
+- [`dcaf549`](https://github.com/songloft-org/songloft/commit/dcaf549bfb4d56106c5f039966e086d9f78f06dd) - **miot**: 播放控制栏底部安全区域适配 *(PR [#192](https://github.com/songloft-org/songloft/pull/192) by [@hanxi](https://github.com/hanxi))*
+- [`a135f18`](https://github.com/songloft-org/songloft/commit/a135f18da5a0ba2026d61e3744e65bbbbc2f59f1) - **miot**: 修复 Web 端停止播放后进度条持续走动 *(PR [#191](https://github.com/songloft-org/songloft/pull/191) by [@hanxi](https://github.com/hanxi))*
+- [`7d00a65`](https://github.com/songloft-org/songloft/commit/7d00a655ed0c875ad08311fa863149df1180aff9) - **miot**: 修复语音口令含歌手名时误匹配其他歌曲 *(PR [#199](https://github.com/songloft-org/songloft/pull/199) by [@hanxi](https://github.com/hanxi))*
+- [`37860bd`](https://github.com/songloft-org/songloft/commit/37860bd6c54f4ee00e7566ddeb372fb536177b71) - **miot**: 语音口令歌单匹配优化 *(PR [#198](https://github.com/songloft-org/songloft/pull/198) by [@hanxi](https://github.com/hanxi))*
+
+### :memo: Documentation Changes
+- [`f65c86b`](https://github.com/songloft-org/songloft/commit/f65c86b004f5ba549077985c73f6fd619373ef30) - update CHANGELOG for v2.8.6 *(commit by [@github-actions[bot]](https://github.com/apps/github-actions))*
+
+### :wrench: Chores
+- [`d8d9f0b`](https://github.com/songloft-org/songloft/commit/d8d9f0b9c41aaa2416dbdb6c08c43f5e4ba81623) - release version 2.8.7 *(commit by [@hanxi](https://github.com/hanxi))*
+
+
 ## [v2.8.6] - 2026-06-19
 ### :sparkles: New Features
 - [`2341268`](https://github.com/songloft-org/songloft/commit/23412687dc4050de1e53146a69b2f0bcfe6fcb87) - **songs**: 批量刷新远程歌曲时长 API *(PR [#185](https://github.com/songloft-org/songloft/pull/185) by [@hanxi](https://github.com/hanxi))*
@@ -1352,3 +1370,4 @@
 [v2.8.4]: https://github.com/songloft-org/songloft/compare/v2.8.3...v2.8.4
 [v2.8.5]: https://github.com/songloft-org/songloft/compare/v2.8.4...v2.8.5
 [v2.8.6]: https://github.com/songloft-org/songloft/compare/v2.8.5...v2.8.6
+[v2.8.7]: https://github.com/songloft-org/songloft/compare/v2.8.6...v2.8.7

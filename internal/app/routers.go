@@ -48,7 +48,7 @@ func (a *App) setupAPIV1Router() {
 	songHandler.SetGetMusicPath(a.scanner.GetMusicPath)
 	songHandler.SetPlayBroadcaster(&playEventBroadcastAdapter{m: a.jsPluginManager})
 	songHandler.SetLyricSearcher(a.jsPluginManager)
-	songHandler.SetDurationRefresher(a.durationRefresher)
+	songHandler.SetMetadataRefresher(a.metadataRefresher)
 	playlistHandler := handlers.NewPlaylistHandler(a.playlistService, a.songService)
 	configHandler := handlers.NewConfigHandler(a.configService)
 	scanHandler := handlers.NewScanHandler(a.songService, a.scanner, a.configService)
@@ -132,9 +132,9 @@ func (a *App) setupAPIV1Router() {
 			r.Post("/songs/organize", songHandler.OrganizeSongs)
 			r.Post("/songs/{id}/activate", songHandler.ActivateSong)
 			r.Post("/songs/{id}/played", songHandler.SongPlayed)
-			r.Post("/songs/refresh-duration", songHandler.StartDurationRefresh)
-			r.Get("/songs/refresh-duration/progress", songHandler.GetDurationRefreshProgress)
-			r.Post("/songs/refresh-duration/cancel", songHandler.CancelDurationRefresh)
+			r.Post("/songs/refresh-metadata", songHandler.StartMetadataRefresh)
+			r.Get("/songs/refresh-metadata/progress", songHandler.GetMetadataRefreshProgress)
+			r.Post("/songs/refresh-metadata/cancel", songHandler.CancelMetadataRefresh)
 
 			// 歌单管理模块
 			backupHandler := handlers.NewBackupHandler(a.backupService)

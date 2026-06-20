@@ -712,7 +712,12 @@ func boolToInt64(b bool) int64 {
 	return 0
 }
 
-// ListSongsNeedingDuration 返回所有 duration=0 的远程歌曲（用于批量时长探测）。
-func (r *SongRepository) ListSongsNeedingDuration(ctx context.Context) ([]sqlc.ListSongsNeedingDurationRow, error) {
-	return r.queries.ListSongsNeedingDuration(ctx)
+// ListSongsNeedingMetadata 返回所有元数据缺失的远程歌曲（用于批量元数据探测）。
+func (r *SongRepository) ListSongsNeedingMetadata(ctx context.Context) ([]sqlc.ListSongsNeedingMetadataRow, error) {
+	return r.queries.ListSongsNeedingMetadata(ctx)
+}
+
+// UpdateMetadata 条件更新远程歌曲的多个元数据字段（仅在原值为空时填充）。
+func (r *SongRepository) UpdateMetadata(ctx context.Context, params sqlc.UpdateSongMetadataParams) error {
+	return r.queries.UpdateSongMetadata(ctx, params)
 }

@@ -45,7 +45,7 @@ type SongHandler struct {
 	getMusicPath      func() string          // 获取 music_path（由 scanner.GetMusicPath 注入）
 	playBroadcaster   PlayEventBroadcaster   // JS 插件播放事件广播（可选，nil 安全）
 	lyricSearcher     LyricSearcher          // 歌词提供者搜索（可选，nil 安全）
-	durationRefresher *services.DurationRefresher
+	metadataRefresher *services.MetadataRefresher
 }
 
 // NewSongHandler 创建歌曲处理器
@@ -82,60 +82,60 @@ func (h *SongHandler) SetLyricSearcher(s LyricSearcher) {
 	h.lyricSearcher = s
 }
 
-// SetDurationRefresher 注入时长刷新器。
-func (h *SongHandler) SetDurationRefresher(d *services.DurationRefresher) {
-	h.durationRefresher = d
+// SetMetadataRefresher 注入元数据刷新器。
+func (h *SongHandler) SetMetadataRefresher(d *services.MetadataRefresher) {
+	h.metadataRefresher = d
 }
 
-// StartDurationRefresh 触发刷新远程歌曲时长
-// @Summary 刷新远程歌曲时长
-// @Description 对所有 duration=0 的远程歌曲，通过 ffprobe 探测实际播放时长并回填。已在运行时返回 409。
+// StartMetadataRefresh 触发刷新远程歌曲元数据
+// @Summary 刷新远程歌曲元数据
+// @Description 对所有元数据缺失的远程歌曲，通过 ffprobe 探测时长、比特率、采样率、格式及标签并回填。已在运行时返回 409。
 // @Tags 歌曲管理
 // @Produce json
 // @Success 202 {object} map[string]string "已启动"
 // @Failure 409 {object} map[string]string "已在运行"
 // @Failure 500 {object} map[string]string "启动失败"
 // @Security BearerAuth
-// @Router /songs/refresh-duration [post]
-func (h *SongHandler) StartDurationRefresh(w http.ResponseWriter, r *http.Request) {
-	if h.durationRefresher == nil {
-		respondError(w, http.StatusInternalServerError, "duration refresher not configured", nil)
+// @Router /songs/refresh-metadata [post]
+func (h *SongHandler) StartMetadataRefresh(w http.ResponseWriter, r *http.Request) {
+	if h.metadataRefresher == nil {
+		respondError(w, http.StatusInternalServerError, "metadata refresher not configured", nil)
 		return
 	}
-	if err := h.durationRefresher.Start(); err != nil {
+	if err := h.metadataRefresher.Start(); err != nil {
 		respondError(w, http.StatusConflict, err.Error(), nil)
 		return
 	}
 	respondJSON(w, http.StatusAccepted, map[string]string{"status": "started"})
 }
 
-// GetDurationRefreshProgress 获取时长刷新进度
-// @Summary 获取时长刷新进度
-// @Description 轮询远程歌曲时长刷新的执行状态和进度
+// GetMetadataRefreshProgress 获取元数据刷新进度
+// @Summary 获取元数据刷新进度
+// @Description 轮询远程歌曲元数据刷新的执行状态和进度
 // @Tags 歌曲管理
 // @Produce json
-// @Success 200 {object} services.DurationRefreshProgress "进度信息"
+// @Success 200 {object} services.MetadataRefreshProgress "进度信息"
 // @Security BearerAuth
-// @Router /songs/refresh-duration/progress [get]
-func (h *SongHandler) GetDurationRefreshProgress(w http.ResponseWriter, r *http.Request) {
-	if h.durationRefresher == nil {
-		respondJSON(w, http.StatusOK, services.DurationRefreshProgress{Status: "idle"})
+// @Router /songs/refresh-metadata/progress [get]
+func (h *SongHandler) GetMetadataRefreshProgress(w http.ResponseWriter, r *http.Request) {
+	if h.metadataRefresher == nil {
+		respondJSON(w, http.StatusOK, services.MetadataRefreshProgress{Status: "idle"})
 		return
 	}
-	respondJSON(w, http.StatusOK, h.durationRefresher.GetProgress())
+	respondJSON(w, http.StatusOK, h.metadataRefresher.GetProgress())
 }
 
-// CancelDurationRefresh 取消时长刷新
-// @Summary 取消时长刷新
-// @Description 取消正在执行的远程歌曲时长刷新任务
+// CancelMetadataRefresh 取消元数据刷新
+// @Summary 取消元数据刷新
+// @Description 取消正在执行的远程歌曲元数据刷新任务
 // @Tags 歌曲管理
 // @Produce json
 // @Success 204 "已取消"
 // @Security BearerAuth
-// @Router /songs/refresh-duration/cancel [post]
-func (h *SongHandler) CancelDurationRefresh(w http.ResponseWriter, r *http.Request) {
-	if h.durationRefresher != nil {
-		h.durationRefresher.Cancel()
+// @Router /songs/refresh-metadata/cancel [post]
+func (h *SongHandler) CancelMetadataRefresh(w http.ResponseWriter, r *http.Request) {
+	if h.metadataRefresher != nil {
+		h.metadataRefresher.Cancel()
 	}
 	w.WriteHeader(http.StatusNoContent)
 }

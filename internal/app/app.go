@@ -51,7 +51,7 @@ type App struct {
 	jsPluginManager    *jsplugin.Manager
 	sourceMetrics      *source.SourceMetrics
 	sourceOrchestrator *source.SourceOrchestrator
-	durationRefresher  *services.DurationRefresher
+	metadataRefresher  *services.MetadataRefresher
 	playActivity       *playactivity.Registry // 跨 song/会话 cancel 的全局表，处理快速切歌时旧请求的让位（issue #79）
 	webDist            embed.FS
 	tracelyClient      *tracely.Client
@@ -248,6 +248,8 @@ func (a *App) Init() error {
 		ffmpegConfig.Path = "ffmpeg"
 	}
 	a.cacheService.SetFFmpegPath(ffmpegConfig.Path)
+	a.metadataExtractor.SetFFMpegPath(ffmpegConfig.Path)
+	a.metadataExtractor.SetHTTPClient(httputil.NewClient(30 * time.Second))
 
 	// 让 SongService.Delete/BatchDelete 联动清理 cache,避免 ID 复用时旧 cache 被新 song 误命中
 	a.songService.SetCacheService(a.cacheService)
@@ -345,9 +347,9 @@ func (a *App) Init() error {
 		},
 		a.songService.UpdateSongDuration,
 	)
-	a.durationRefresher = services.NewDurationRefresher(
-		songRepo.ListSongsNeedingDuration,
-		a.songService.UpdateSongDuration,
+	a.metadataRefresher = services.NewMetadataRefresher(
+		songRepo.ListSongsNeedingMetadata,
+		songRepo.UpdateMetadata,
 		func(ctx context.Context, song *models.Song) (string, error) {
 			if song.IsPluginSourced() {
 				return a.cacheService.ResolveURL(ctx, song)

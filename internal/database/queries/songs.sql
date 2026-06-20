@@ -128,7 +128,25 @@ SELECT id, type, title, artist, album, duration, file_path, url,
     isrc, cache_path
 FROM songs WHERE cache_path != '';
 
--- name: ListSongsNeedingDuration :many
-SELECT id, plugin_entry_path, source_data, url
+-- name: ListSongsNeedingMetadata :many
+SELECT id, plugin_entry_path, source_data, url,
+    title, artist, album, duration,
+    bit_rate, sample_rate, format, cover_path, cover_url
 FROM songs
-WHERE type = 'remote' AND (duration = 0 OR duration IS NULL);
+WHERE type = 'remote' AND (
+    duration = 0 OR duration IS NULL
+    OR bit_rate = 0 OR sample_rate = 0 OR format = ''
+);
+
+-- name: UpdateSongMetadata :exec
+UPDATE songs SET
+    duration    = CASE WHEN duration = 0    AND ? > 0   THEN ? ELSE duration END,
+    bit_rate    = CASE WHEN bit_rate = 0    AND ? > 0   THEN ? ELSE bit_rate END,
+    sample_rate = CASE WHEN sample_rate = 0 AND ? > 0   THEN ? ELSE sample_rate END,
+    format      = CASE WHEN format = ''     AND ? != '' THEN ? ELSE format END,
+    title       = CASE WHEN title = ''      AND ? != '' THEN ? ELSE title END,
+    artist      = CASE WHEN artist = ''     AND ? != '' THEN ? ELSE artist END,
+    album       = CASE WHEN album = ''      AND ? != '' THEN ? ELSE album END,
+    cover_path  = CASE WHEN cover_path = '' AND ? != '' THEN ? ELSE cover_path END,
+    updated_at  = CURRENT_TIMESTAMP
+WHERE id = ?;

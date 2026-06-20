@@ -1,31 +1,50 @@
 package services
 
 import (
+	"bytes"
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"log/slog"
+	"net/http"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/hanxi/tag"
+
+	"songloft/internal/httputil"
 )
 
 // MetadataConfig 元数据提取配置
 type MetadataConfig struct {
-	FFProbePath      string // ffprobe 可执行文件路径
-	CoverStoragePath string // 封面存储根目录
-	TitleSource      string // "tag"(默认): tag 优先; "filename": 始终用文件名
+	FFProbePath      string       // ffprobe 可执行文件路径
+	FFMpegPath       string       // ffmpeg 可执行文件路径（可选，用于从远程 URL 提取封面）
+	CoverStoragePath string       // 封面存储根目录
+	TitleSource      string       // "tag"(默认): tag 优先; "filename": 始终用文件名
+	HTTPClient       *http.Client // HTTP 客户端（可选，用于 tag 库远程探测）
 }
 
 // MetadataExtractor 元数据提取器
 type MetadataExtractor struct {
 	config *MetadataConfig
+}
+
+// RemoteProbeResult 远程 URL 元数据探测结果
+type RemoteProbeResult struct {
+	Duration   float64
+	BitRate    int
+	SampleRate int
+	Format     string
+	Title      string
+	Artist     string
+	Album      string
+	CoverPath  string // tag 库提取封面后保存的路径（可能为空）
 }
 
 // Metadata 音频元数据
@@ -78,6 +97,16 @@ func NewMetadataExtractor(config *MetadataConfig) *MetadataExtractor {
 // SetTitleSource 更新标题来源配置（配置变更时调用）
 func (m *MetadataExtractor) SetTitleSource(titleSource string) {
 	m.config.TitleSource = titleSource
+}
+
+// SetFFMpegPath 更新 ffmpeg 路径配置（配置变更时调用）
+func (m *MetadataExtractor) SetFFMpegPath(path string) {
+	m.config.FFMpegPath = path
+}
+
+// SetHTTPClient 注入 HTTP 客户端（用于 tag 库远程探测 Range 请求）
+func (m *MetadataExtractor) SetHTTPClient(client *http.Client) {
+	m.config.HTTPClient = client
 }
 
 // Extract 提取音频文件的元数据
@@ -336,11 +365,73 @@ func (m *MetadataExtractor) ExtractDuration(ctx context.Context, filePath string
 	return 0, nil
 }
 
-// ProbeDurationFromURL 通过 ffprobe 探测远程 URL 的音频时长。
-// ffprobe 原生支持 HTTP/HTTPS（含 Basic Auth），仅下载头部数据即可获取时长。
-func (m *MetadataExtractor) ProbeDurationFromURL(ctx context.Context, url string) (float64, error) {
+// ProbeMetadataFromURL 探测远程 URL 的音频元数据。
+// 优先通过 HTTP Range + tag 库提取（更准确、含封面），tag 库失败或关键字段缺失时 fallback 到 ffprobe。
+func (m *MetadataExtractor) ProbeMetadataFromURL(ctx context.Context, rawURL string) (*RemoteProbeResult, error) {
+	result := &RemoteProbeResult{}
+
+	// 阶段 1：tag 库优先
+	if m.config.HTTPClient != nil {
+		if err := m.probeWithTagLib(ctx, rawURL, result); err != nil {
+			slog.Debug("tag lib probe failed, will fallback to ffprobe", "url", rawURL, "error", err)
+		}
+	}
+
+	// 阶段 2：ffprobe 兜底（tag 库整体失败或关键字段缺失）
+	needProbe := result.Duration == 0 || result.BitRate == 0 || result.SampleRate == 0
+	if needProbe {
+		if err := m.probeWithFFProbe(ctx, rawURL, result); err != nil {
+			if result.Title == "" && result.Duration == 0 {
+				return nil, fmt.Errorf("both tag lib and ffprobe failed: %w", err)
+			}
+			slog.Debug("ffprobe fallback also failed", "url", rawURL, "error", err)
+		}
+	}
+
+	return result, nil
+}
+
+// probeWithTagLib 通过 HTTP Range + tag 库提取元数据。
+func (m *MetadataExtractor) probeWithTagLib(ctx context.Context, rawURL string, result *RemoteProbeResult) error {
+	reader, err := httputil.NewHTTPReadSeeker(m.config.HTTPClient, rawURL)
+	if err != nil {
+		return fmt.Errorf("create http reader: %w", err)
+	}
+
+	tagMeta, err := tag.ReadFrom(reader)
+	if err != nil {
+		return fmt.Errorf("tag.ReadFrom: %w", err)
+	}
+
+	result.Title = tagMeta.Title()
+	result.Artist = tagMeta.Artist()
+	result.Album = tagMeta.Album()
+	result.Format = NormalizeFormat(string(tagMeta.FileType()))
+
+	if d := tagMeta.Duration(); d > 0 {
+		result.Duration = d.Seconds()
+	}
+	if br := tagMeta.BitRate(); br > 0 {
+		result.BitRate = br
+	}
+	if sr := tagMeta.SampleRate(); sr > 0 {
+		result.SampleRate = sr
+	}
+
+	// 提取封面
+	if picture := tagMeta.Picture(); picture != nil && len(picture.Data) > 0 {
+		if coverPath, err := m.SaveCoverData(picture.Data, picture.Ext); err == nil {
+			result.CoverPath = coverPath
+		}
+	}
+
+	return nil
+}
+
+// probeWithFFProbe 通过 ffprobe 补充缺失的元数据字段。
+func (m *MetadataExtractor) probeWithFFProbe(ctx context.Context, rawURL string, result *RemoteProbeResult) error {
 	if m.config.FFProbePath == "" {
-		return 0, fmt.Errorf("ffprobe not configured")
+		return fmt.Errorf("ffprobe not configured")
 	}
 	cmd := exec.CommandContext(
 		ctx,
@@ -348,21 +439,105 @@ func (m *MetadataExtractor) ProbeDurationFromURL(ctx context.Context, url string
 		"-v", "quiet",
 		"-print_format", "json",
 		"-show_format",
+		"-show_streams",
 		"-analyzeduration", "10000000",
-		url,
+		rawURL,
 	)
 	output, err := cmd.Output()
 	if err != nil {
-		return 0, fmt.Errorf("ffprobe url: %w", err)
+		return fmt.Errorf("ffprobe url: %w", err)
 	}
 	var probe FFProbeOutput
 	if err := json.Unmarshal(output, &probe); err != nil {
-		return 0, fmt.Errorf("parse ffprobe output: %w", err)
+		return fmt.Errorf("parse ffprobe output: %w", err)
 	}
-	if probe.Format.Duration != "" {
-		return parseDuration(probe.Format.Duration)
+
+	if result.Duration == 0 && probe.Format.Duration != "" {
+		if d, err := parseDuration(probe.Format.Duration); err == nil {
+			result.Duration = d
+		}
 	}
-	return 0, nil
+	if result.BitRate == 0 && probe.Format.BitRate != "" {
+		if br, err := parseInteger(probe.Format.BitRate); err == nil {
+			result.BitRate = br / 1000
+		}
+	}
+	if result.Format == "" && probe.Format.FormatName != "" {
+		formats := strings.Split(probe.Format.FormatName, ",")
+		if len(formats) > 0 {
+			result.Format = formats[0]
+		}
+	}
+	if result.SampleRate == 0 {
+		for _, stream := range probe.Streams {
+			if stream.CodecType == "audio" && stream.SampleRate != "" {
+				if sr, err := parseInteger(stream.SampleRate); err == nil {
+					result.SampleRate = sr
+					break
+				}
+			}
+		}
+	}
+
+	if tags := mergeFFProbeTags(&probe); len(tags) > 0 {
+		if result.Title == "" {
+			result.Title = pickTag(tags, "title", "TITLE")
+		}
+		if result.Artist == "" {
+			result.Artist = pickTag(tags, "artist", "ARTIST", "album_artist", "ALBUM_ARTIST")
+		}
+		if result.Album == "" {
+			result.Album = pickTag(tags, "album", "ALBUM")
+		}
+	}
+
+	return nil
+}
+
+// ExtractCoverFromURL 通过 ffmpeg 从远程 URL 提取嵌入封面（best-effort）。
+// 仅在 FFMpegPath 已配置时可用，失败不应阻塞主流程。
+func (m *MetadataExtractor) ExtractCoverFromURL(ctx context.Context, url string) (string, error) {
+	if m.config.FFMpegPath == "" {
+		return "", fmt.Errorf("ffmpeg not configured")
+	}
+
+	coverCtx, cancel := context.WithTimeout(ctx, 15*time.Second)
+	defer cancel()
+
+	cmd := exec.CommandContext(
+		coverCtx,
+		m.config.FFMpegPath,
+		"-i", url,
+		"-an",
+		"-vcodec", "copy",
+		"-f", "image2pipe",
+		"pipe:1",
+	)
+
+	var buf bytes.Buffer
+	cmd.Stdout = &limitedWriter{w: &buf, limit: maxCoverSize}
+	cmd.Stderr = nil
+
+	if err := cmd.Run(); err != nil {
+		return "", fmt.Errorf("ffmpeg extract cover: %w", err)
+	}
+	if buf.Len() == 0 {
+		return "", fmt.Errorf("no cover data extracted")
+	}
+
+	return m.SaveCoverData(buf.Bytes(), "jpg")
+}
+
+type limitedWriter struct {
+	w     *bytes.Buffer
+	limit int
+}
+
+func (lw *limitedWriter) Write(p []byte) (int, error) {
+	if lw.w.Len()+len(p) > lw.limit {
+		return 0, fmt.Errorf("cover data exceeds %d bytes", lw.limit)
+	}
+	return lw.w.Write(p)
 }
 
 // runFFProbe 执行 ffprobe 并解析 JSON 输出

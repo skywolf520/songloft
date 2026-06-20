@@ -422,33 +422,56 @@ func (q *Queries) ListSongsByFingerprint(ctx context.Context, fingerprint string
 	return items, nil
 }
 
-const listSongsNeedingDuration = `-- name: ListSongsNeedingDuration :many
-SELECT id, plugin_entry_path, source_data, url
+const listSongsNeedingMetadata = `-- name: ListSongsNeedingMetadata :many
+SELECT id, plugin_entry_path, source_data, url,
+    title, artist, album, duration,
+    bit_rate, sample_rate, format, cover_path, cover_url
 FROM songs
-WHERE type = 'remote' AND (duration = 0 OR duration IS NULL)
+WHERE type = 'remote' AND (
+    duration = 0 OR duration IS NULL
+    OR bit_rate = 0 OR sample_rate = 0 OR format = ''
+)
 `
 
-type ListSongsNeedingDurationRow struct {
+type ListSongsNeedingMetadataRow struct {
 	ID              int64
 	PluginEntryPath string
 	SourceData      string
 	Url             string
+	Title           string
+	Artist          string
+	Album           string
+	Duration        float64
+	BitRate         int64
+	SampleRate      int64
+	Format          string
+	CoverPath       string
+	CoverUrl        string
 }
 
-func (q *Queries) ListSongsNeedingDuration(ctx context.Context) ([]ListSongsNeedingDurationRow, error) {
-	rows, err := q.db.QueryContext(ctx, listSongsNeedingDuration)
+func (q *Queries) ListSongsNeedingMetadata(ctx context.Context) ([]ListSongsNeedingMetadataRow, error) {
+	rows, err := q.db.QueryContext(ctx, listSongsNeedingMetadata)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	items := []ListSongsNeedingDurationRow{}
+	items := []ListSongsNeedingMetadataRow{}
 	for rows.Next() {
-		var i ListSongsNeedingDurationRow
+		var i ListSongsNeedingMetadataRow
 		if err := rows.Scan(
 			&i.ID,
 			&i.PluginEntryPath,
 			&i.SourceData,
 			&i.Url,
+			&i.Title,
+			&i.Artist,
+			&i.Album,
+			&i.Duration,
+			&i.BitRate,
+			&i.SampleRate,
+			&i.Format,
+			&i.CoverPath,
+			&i.CoverUrl,
 		); err != nil {
 			return nil, err
 		}
@@ -732,6 +755,63 @@ func (q *Queries) UpdateSongLyrics(ctx context.Context, arg UpdateSongLyricsPara
 		return 0, err
 	}
 	return result.RowsAffected()
+}
+
+const updateSongMetadata = `-- name: UpdateSongMetadata :exec
+UPDATE songs SET
+    duration    = CASE WHEN duration = 0    AND ? > 0   THEN ? ELSE duration END,
+    bit_rate    = CASE WHEN bit_rate = 0    AND ? > 0   THEN ? ELSE bit_rate END,
+    sample_rate = CASE WHEN sample_rate = 0 AND ? > 0   THEN ? ELSE sample_rate END,
+    format      = CASE WHEN format = ''     AND ? != '' THEN ? ELSE format END,
+    title       = CASE WHEN title = ''      AND ? != '' THEN ? ELSE title END,
+    artist      = CASE WHEN artist = ''     AND ? != '' THEN ? ELSE artist END,
+    album       = CASE WHEN album = ''      AND ? != '' THEN ? ELSE album END,
+    cover_path  = CASE WHEN cover_path = '' AND ? != '' THEN ? ELSE cover_path END,
+    updated_at  = CURRENT_TIMESTAMP
+WHERE id = ?
+`
+
+type UpdateSongMetadataParams struct {
+	Column1    interface{}
+	Duration   float64
+	Column3    interface{}
+	BitRate    int64
+	Column5    interface{}
+	SampleRate int64
+	Column7    interface{}
+	Format     string
+	Column9    interface{}
+	Title      string
+	Column11   interface{}
+	Artist     string
+	Column13   interface{}
+	Album      string
+	Column15   interface{}
+	CoverPath  string
+	ID         int64
+}
+
+func (q *Queries) UpdateSongMetadata(ctx context.Context, arg UpdateSongMetadataParams) error {
+	_, err := q.db.ExecContext(ctx, updateSongMetadata,
+		arg.Column1,
+		arg.Duration,
+		arg.Column3,
+		arg.BitRate,
+		arg.Column5,
+		arg.SampleRate,
+		arg.Column7,
+		arg.Format,
+		arg.Column9,
+		arg.Title,
+		arg.Column11,
+		arg.Artist,
+		arg.Column13,
+		arg.Album,
+		arg.Column15,
+		arg.CoverPath,
+		arg.ID,
+	)
+	return err
 }
 
 const updateSongSource = `-- name: UpdateSongSource :exec

@@ -4765,21 +4765,21 @@
                 }
             }
         },
-        "/songs/refresh-duration": {
+        "/songs/refresh-metadata": {
             "post": {
                 "security": [
                     {
                         "BearerAuth": []
                     }
                 ],
-                "description": "对所有 duration=0 的远程歌曲，通过 ffprobe 探测实际播放时长并回填。已在运行时返回 409。",
+                "description": "对所有元数据缺失的远程歌曲，通过 ffprobe 探测时长、比特率、采样率、格式及标签并回填。已在运行时返回 409。",
                 "produces": [
                     "application/json"
                 ],
                 "tags": [
                     "歌曲管理"
                 ],
-                "summary": "刷新远程歌曲时长",
+                "summary": "刷新远程歌曲元数据",
                 "responses": {
                     "202": {
                         "description": "已启动",
@@ -4811,21 +4811,21 @@
                 }
             }
         },
-        "/songs/refresh-duration/cancel": {
+        "/songs/refresh-metadata/cancel": {
             "post": {
                 "security": [
                     {
                         "BearerAuth": []
                     }
                 ],
-                "description": "取消正在执行的远程歌曲时长刷新任务",
+                "description": "取消正在执行的远程歌曲元数据刷新任务",
                 "produces": [
                     "application/json"
                 ],
                 "tags": [
                     "歌曲管理"
                 ],
-                "summary": "取消时长刷新",
+                "summary": "取消元数据刷新",
                 "responses": {
                     "204": {
                         "description": "已取消"
@@ -4833,26 +4833,26 @@
                 }
             }
         },
-        "/songs/refresh-duration/progress": {
+        "/songs/refresh-metadata/progress": {
             "get": {
                 "security": [
                     {
                         "BearerAuth": []
                     }
                 ],
-                "description": "轮询远程歌曲时长刷新的执行状态和进度",
+                "description": "轮询远程歌曲元数据刷新的执行状态和进度",
                 "produces": [
                     "application/json"
                 ],
                 "tags": [
                     "歌曲管理"
                 ],
-                "summary": "获取时长刷新进度",
+                "summary": "获取元数据刷新进度",
                 "responses": {
                     "200": {
                         "description": "进度信息",
                         "schema": {
-                            "$ref": "#/definitions/services.DurationRefreshProgress"
+                            "$ref": "#/definitions/services.MetadataRefreshProgress"
                         }
                     }
                 }
@@ -7157,23 +7157,6 @@
                 }
             }
         },
-        "services.DurationRefreshProgress": {
-            "type": "object",
-            "properties": {
-                "failed": {
-                    "type": "integer"
-                },
-                "processed": {
-                    "type": "integer"
-                },
-                "status": {
-                    "type": "string"
-                },
-                "total": {
-                    "type": "integer"
-                }
-            }
-        },
         "services.FingerprintProgress": {
             "type": "object",
             "properties": {
@@ -7185,6 +7168,23 @@
                 },
                 "status": {
                     "description": "idle, running, done",
+                    "type": "string"
+                },
+                "total": {
+                    "type": "integer"
+                }
+            }
+        },
+        "services.MetadataRefreshProgress": {
+            "type": "object",
+            "properties": {
+                "failed": {
+                    "type": "integer"
+                },
+                "processed": {
+                    "type": "integer"
+                },
+                "status": {
                     "type": "string"
                 },
                 "total": {

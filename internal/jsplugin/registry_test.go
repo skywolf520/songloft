@@ -603,6 +603,67 @@ func TestFetchAndMerge_TokenWithIncludes(t *testing.T) {
 	}
 }
 
+func TestFetchAndMerge_TokenNotLeakedToCrossOriginIncludes(t *testing.T) {
+	const testToken = "private-token"
+
+	// 公开源：不需要认证，如果收到 Authorization 头则返回 403（模拟 token 泄露检测）
+	publicMux := http.NewServeMux()
+	publicMux.HandleFunc("/public.json", func(w http.ResponseWriter, r *http.Request) {
+		if r.Header.Get("Authorization") != "" {
+			t.Error("token leaked to cross-origin include")
+			w.WriteHeader(http.StatusForbidden)
+			return
+		}
+		reg := RegistryJSON{
+			Plugins: []string{},
+		}
+		json.NewEncoder(w).Encode(reg)
+	})
+	publicSrv := httptest.NewServer(publicMux)
+	defer publicSrv.Close()
+
+	// 私有源：需要认证，include 了公开源
+	pluginMux := http.NewServeMux()
+	pluginMux.HandleFunc("/a/plugin.json", func(w http.ResponseWriter, r *http.Request) {
+		if r.Header.Get("Authorization") != "Bearer "+testToken {
+			w.WriteHeader(http.StatusUnauthorized)
+			return
+		}
+		json.NewEncoder(w).Encode(PluginManifest{
+			Name: "A", EntryPath: "a", Version: "1.0.0", DownloadURL: "https://example.com/a.zip",
+		})
+	})
+	pluginSrv := httptest.NewServer(pluginMux)
+	defer pluginSrv.Close()
+
+	privateMux := http.NewServeMux()
+	privateMux.HandleFunc("/private.json", func(w http.ResponseWriter, r *http.Request) {
+		if r.Header.Get("Authorization") != "Bearer "+testToken {
+			w.WriteHeader(http.StatusUnauthorized)
+			return
+		}
+		reg := RegistryJSON{
+			Includes: []string{publicSrv.URL + "/public.json"},
+			Plugins:  []string{pluginSrv.URL + "/a/plugin.json"},
+		}
+		json.NewEncoder(w).Encode(reg)
+	})
+	privateSrv := httptest.NewServer(privateMux)
+	defer privateSrv.Close()
+
+	svc := NewRegistryService()
+	plugins, warnings, err := svc.FetchAndMerge(context.Background(), privateSrv.URL+"/private.json", "", testToken)
+	if err != nil {
+		t.Fatalf("FetchAndMerge error: %v", err)
+	}
+	if len(warnings) != 0 {
+		t.Errorf("unexpected warnings: %v", warnings)
+	}
+	if len(plugins) != 1 {
+		t.Fatalf("expected 1 plugin, got %d", len(plugins))
+	}
+}
+
 func TestFetchAndMerge_EmptyPlugins(t *testing.T) {
 	registry := RegistryJSON{
 		Name:    "Empty",

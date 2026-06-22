@@ -7,6 +7,7 @@ import (
 	"io"
 	"log/slog"
 	"net/http"
+	"net/url"
 	"strconv"
 	"strings"
 	"sync"
@@ -146,7 +147,11 @@ func (s *RegistryService) fetchRecursive(
 		if includeURL == "" {
 			continue
 		}
-		if err := s.fetchRecursive(ctx, includeURL, githubProxy, token, depth+1, visited, pluginURLs, warnings); err != nil {
+		includeToken := ""
+		if token != "" && sameHost(url, includeURL) {
+			includeToken = token
+		}
+		if err := s.fetchRecursive(ctx, includeURL, githubProxy, includeToken, depth+1, visited, pluginURLs, warnings); err != nil {
 			return err
 		}
 	}
@@ -305,4 +310,17 @@ func compareVersion(a, b string) int {
 		}
 	}
 	return 0
+}
+
+// sameHost 判断两个 URL 的 host 是否相同（scheme+host+port）。
+func sameHost(a, b string) bool {
+	ua, err := url.Parse(a)
+	if err != nil {
+		return false
+	}
+	ub, err := url.Parse(b)
+	if err != nil {
+		return false
+	}
+	return strings.EqualFold(ua.Host, ub.Host)
 }

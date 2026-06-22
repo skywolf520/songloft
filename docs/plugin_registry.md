@@ -209,7 +209,12 @@ https://cdn.jsdelivr.net/gh/{用户名}/{仓库名}@{分支}/registry.json
 
 在「管理订阅源」对话框中添加或编辑源时，填入 Token 字段即可。配置了 Token 的源会在列表中显示锁图标。
 
-Token 会随该源的所有 HTTP 请求（registry JSON、plugin.json、includes、ZIP 下载）以 `Authorization: Bearer <token>` 头发送。
+Token 以 `Authorization: Bearer <token>` 头发送。作用域规则：
+
+- **registry JSON 本身**、**plugins 数组中的所有 URL**、**ZIP 下载** — 始终带 token
+- **includes 引用的子源** — 仅与源 URL **同 host** 时带 token，跨域 includes 不带 token（防止泄露）
+
+因此，私有源可以安全地 include 公开的官方源或第三方源，token 不会被发给它们。同时，同服务器上的私有子源（同 host 的 includes）仍能正常认证。
 
 ### GitHub 私有仓库
 
@@ -239,7 +244,7 @@ location /registry/ {
 ### 安全注意事项
 
 - Token 以明文存储在服务端 config 表中（自托管应用，在用户控制范围内）
-- Token 会发给该源下拉取的**所有** URL（包括 `includes` 引用的子源），私有源不应 include 不受信任的第三方源
+- `includes` 引用的子源仅在**同 host** 时携带 token，跨域 includes 不会泄露 token
 - Token 通过 `Authorization` 请求头发送，不会出现在 URL 中，不会泄露到日志或 Referrer
 
 ---

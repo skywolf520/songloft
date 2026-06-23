@@ -46,6 +46,7 @@ type SongHandler struct {
 	playBroadcaster   PlayEventBroadcaster   // JS 插件播放事件广播（可选，nil 安全）
 	lyricSearcher     LyricSearcher          // 歌词提供者搜索（可选，nil 安全）
 	metadataRefresher *services.MetadataRefresher
+	configService     *services.ConfigService
 	urlResolver       *services.InternalURLResolver // 把插件相对路径解析为本机绝对 URL + access_token（封面代理用）
 }
 
@@ -88,9 +89,70 @@ func (h *SongHandler) SetMetadataRefresher(d *services.MetadataRefresher) {
 	h.metadataRefresher = d
 }
 
+// SetConfigService 注入配置服务（远程标题来源设置用）。
+func (h *SongHandler) SetConfigService(cs *services.ConfigService) {
+	h.configService = cs
+}
+
 // SetURLResolver 注入内部 URL 解析器，用于将插件相对路径（如封面 URL）解析为本机可访问的绝对 URL。
 func (h *SongHandler) SetURLResolver(r *services.InternalURLResolver) {
 	h.urlResolver = r
+}
+
+const remoteTitleSourceConfigKey = "remote_title_source"
+
+// remoteTitleSourceRequest /settings/remote-title-source 请求/响应体
+type remoteTitleSourceRequest struct {
+	TitleSource string `json:"title_source" example:"filename" enums:"tag,filename"`
+}
+
+// GetRemoteTitleSourceSetting GET /api/v1/settings/remote-title-source
+// @Summary 获取网络歌曲标题来源配置
+// @Description tag：元数据刷新时用音频标签覆盖标题；filename（默认）：保持文件名作为标题，不覆盖。
+// @Tags 歌曲管理
+// @Produce json
+// @Success 200 {object} remoteTitleSourceRequest "返回 title_source 字段"
+// @Security BearerAuth
+// @Router /settings/remote-title-source [get]
+func (h *SongHandler) GetRemoteTitleSourceSetting(w http.ResponseWriter, r *http.Request) {
+	titleSource := "filename"
+	if h.configService != nil {
+		titleSource = h.configService.GetString(remoteTitleSourceConfigKey, "filename")
+	}
+	respondJSON(w, http.StatusOK, remoteTitleSourceRequest{TitleSource: titleSource})
+}
+
+// UpdateRemoteTitleSourceSetting PUT /api/v1/settings/remote-title-source
+// @Summary 更新网络歌曲标题来源配置
+// @Description tag：元数据刷新时用音频标签覆盖标题；filename（默认）：保持文件名作为标题，不覆盖。
+// @Tags 歌曲管理
+// @Accept json
+// @Produce json
+// @Param request body remoteTitleSourceRequest true "标题来源配置"
+// @Success 200 {object} remoteTitleSourceRequest "返回 title_source 字段"
+// @Failure 400 {object} map[string]string "请求格式错误或参数无效"
+// @Failure 500 {object} map[string]string "保存配置失败"
+// @Security BearerAuth
+// @Router /settings/remote-title-source [put]
+func (h *SongHandler) UpdateRemoteTitleSourceSetting(w http.ResponseWriter, r *http.Request) {
+	if h.configService == nil {
+		respondError(w, http.StatusInternalServerError, "configService 未注入", nil)
+		return
+	}
+	var req remoteTitleSourceRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		respondError(w, http.StatusBadRequest, "请求格式错误", err)
+		return
+	}
+	if req.TitleSource != "tag" && req.TitleSource != "filename" {
+		respondError(w, http.StatusBadRequest, "title_source 必须为 tag 或 filename", nil)
+		return
+	}
+	if err := h.configService.Set(remoteTitleSourceConfigKey, req.TitleSource); err != nil {
+		respondError(w, http.StatusInternalServerError, "保存配置失败", err)
+		return
+	}
+	respondJSON(w, http.StatusOK, remoteTitleSourceRequest{TitleSource: req.TitleSource})
 }
 
 // StartMetadataRefresh 触发刷新远程歌曲元数据
@@ -1055,7 +1117,17 @@ func (h *SongHandler) serveRemote(w http.ResponseWriter, r *http.Request, song *
 		return
 	}
 
-	// 3. 流式代理 + 后台缓存
+	// 3. 播放时异步提取元数据（首次播放触发，后续跳过）
+	if h.metadataRefresher != nil && services.NeedsMetadata(song) {
+		refreshCopy := *song
+		go func() {
+			ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+			defer cancel()
+			h.metadataRefresher.RefreshSong(ctx, &refreshCopy, playURL)
+		}()
+	}
+
+	// 4. 流式代理 + 后台缓存
 	songCopy := *song
 	ServeRemoteResourceWithCache(w, r, playURL,
 		func(tmpPath, contentType string) {

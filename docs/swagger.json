@@ -4029,6 +4029,86 @@
                 }
             }
         },
+        "/settings/remote-title-source": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "tag：元数据刷新时用音频标签覆盖标题；filename（默认）：保持文件名作为标题，不覆盖。",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "歌曲管理"
+                ],
+                "summary": "获取网络歌曲标题来源配置",
+                "responses": {
+                    "200": {
+                        "description": "返回 title_source 字段",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.remoteTitleSourceRequest"
+                        }
+                    }
+                }
+            },
+            "put": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "tag：元数据刷新时用音频标签覆盖标题；filename（默认）：保持文件名作为标题，不覆盖。",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "歌曲管理"
+                ],
+                "summary": "更新网络歌曲标题来源配置",
+                "parameters": [
+                    {
+                        "description": "标题来源配置",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/handlers.remoteTitleSourceRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "返回 title_source 字段",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.remoteTitleSourceRequest"
+                        }
+                    },
+                    "400": {
+                        "description": "请求格式错误或参数无效",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "保存配置失败",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            }
+        },
         "/settings/scan-auto-create-include-subdirs": {
             "get": {
                 "security": [
@@ -6377,6 +6457,19 @@
                     "items": {
                         "type": "string"
                     }
+                }
+            }
+        },
+        "handlers.remoteTitleSourceRequest": {
+            "type": "object",
+            "properties": {
+                "title_source": {
+                    "type": "string",
+                    "enum": [
+                        "tag",
+                        "filename"
+                    ],
+                    "example": "filename"
                 }
             }
         },

@@ -73,6 +73,7 @@ type Querier interface {
 	UpdateSongMetadata(ctx context.Context, arg UpdateSongMetadataParams) error
 	UpdateSongPositionInPlaylist(ctx context.Context, arg UpdateSongPositionInPlaylistParams) (int64, error)
 	UpdateSongSource(ctx context.Context, arg UpdateSongSourceParams) error
+	UpdateSongTagFields(ctx context.Context, arg UpdateSongTagFieldsParams) error
 }
 
 var _ Querier = (*Queries)(nil)

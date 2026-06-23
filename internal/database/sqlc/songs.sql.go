@@ -829,3 +829,35 @@ func (q *Queries) UpdateSongSource(ctx context.Context, arg UpdateSongSourcePara
 	_, err := q.db.ExecContext(ctx, updateSongSource, arg.PluginEntryPath, arg.SourceData, arg.ID)
 	return err
 }
+
+const updateSongTagFields = `-- name: UpdateSongTagFields :exec
+UPDATE songs SET
+    title  = CASE WHEN ? != '' THEN ? ELSE title END,
+    artist = CASE WHEN ? != '' THEN ? ELSE artist END,
+    album  = CASE WHEN ? != '' THEN ? ELSE album END,
+    updated_at = CURRENT_TIMESTAMP
+WHERE id = ?
+`
+
+type UpdateSongTagFieldsParams struct {
+	Column1 interface{}
+	Title   string
+	Column3 interface{}
+	Artist  string
+	Column5 interface{}
+	Album   string
+	ID      int64
+}
+
+func (q *Queries) UpdateSongTagFields(ctx context.Context, arg UpdateSongTagFieldsParams) error {
+	_, err := q.db.ExecContext(ctx, updateSongTagFields,
+		arg.Column1,
+		arg.Title,
+		arg.Column3,
+		arg.Artist,
+		arg.Column5,
+		arg.Album,
+		arg.ID,
+	)
+	return err
+}

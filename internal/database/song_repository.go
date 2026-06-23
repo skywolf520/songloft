@@ -721,3 +721,8 @@ func (r *SongRepository) ListSongsNeedingMetadata(ctx context.Context) ([]sqlc.L
 func (r *SongRepository) UpdateMetadata(ctx context.Context, params sqlc.UpdateSongMetadataParams) error {
 	return r.queries.UpdateSongMetadata(ctx, params)
 }
+
+// UpdateTagFields 用 tag 值覆盖 artist/album（播放时自动提取用）。
+func (r *SongRepository) UpdateTagFields(ctx context.Context, params sqlc.UpdateSongTagFieldsParams) error {
+	return r.queries.UpdateSongTagFields(ctx, params)
+}

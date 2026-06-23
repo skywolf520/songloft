@@ -150,3 +150,11 @@ UPDATE songs SET
     cover_path  = CASE WHEN cover_path = '' AND ? != '' THEN ? ELSE cover_path END,
     updated_at  = CURRENT_TIMESTAMP
 WHERE id = ?;
+
+-- name: UpdateSongTagFields :exec
+UPDATE songs SET
+    title  = CASE WHEN ? != '' THEN ? ELSE title END,
+    artist = CASE WHEN ? != '' THEN ? ELSE artist END,
+    album  = CASE WHEN ? != '' THEN ? ELSE album END,
+    updated_at = CURRENT_TIMESTAMP
+WHERE id = ?;

@@ -234,6 +234,15 @@ definitions:
           type: string
         type: array
     type: object
+  handlers.remoteTitleSourceRequest:
+    properties:
+      title_source:
+        enum:
+        - tag
+        - filename
+        example: filename
+        type: string
+    type: object
   handlers.scanAutoCreatePlaylistsRequest:
     properties:
       enabled:
@@ -3602,6 +3611,56 @@ paths:
       summary: 保存插件订阅源列表
       tags:
       - JS插件管理
+  /settings/remote-title-source:
+    get:
+      description: tag：元数据刷新时用音频标签覆盖标题；filename（默认）：保持文件名作为标题，不覆盖。
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: 返回 title_source 字段
+          schema:
+            $ref: '#/definitions/handlers.remoteTitleSourceRequest'
+      security:
+      - BearerAuth: []
+      summary: 获取网络歌曲标题来源配置
+      tags:
+      - 歌曲管理
+    put:
+      consumes:
+      - application/json
+      description: tag：元数据刷新时用音频标签覆盖标题；filename（默认）：保持文件名作为标题，不覆盖。
+      parameters:
+      - description: 标题来源配置
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.remoteTitleSourceRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: 返回 title_source 字段
+          schema:
+            $ref: '#/definitions/handlers.remoteTitleSourceRequest'
+        "400":
+          description: 请求格式错误或参数无效
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: 保存配置失败
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: 更新网络歌曲标题来源配置
+      tags:
+      - 歌曲管理
   /settings/scan-auto-create-include-subdirs:
     get:
       produces:

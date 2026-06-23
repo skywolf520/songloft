@@ -373,16 +373,13 @@ func (c *CacheService) FinalizeCache(ctx context.Context, song *models.Song, tmp
 		}
 	}
 
-	if song.Duration == 0 && c.probeDuration != nil && c.updateDuration != nil {
-		go func(songID int64, path string) {
-			dur, err := c.probeDuration(context.Background(), path)
-			if err != nil || dur <= 0 {
-				return
-			}
-			if err := c.updateDuration(context.Background(), songID, dur); err != nil {
-				slog.Warn("duration backfill failed", "songId", songID, "error", err)
-			}
-		}(song.ID, finalPath)
+	if c.onCacheComplete != nil {
+		songCopy := *song
+		go func() {
+			ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+			defer cancel()
+			c.onCacheComplete(ctx, &songCopy, finalPath)
+		}()
 	}
 
 	c.touchSongLRU(song.ID)

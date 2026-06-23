@@ -337,19 +337,10 @@ func (a *App) Init() error {
 		songRepo.ClearAllCachePaths,
 		songRepo.ListSongsWithCache,
 	)
-	a.cacheService.SetDurationBackfillCallbacks(
-		func(ctx context.Context, filePath string) (float64, error) {
-			info, err := a.metadataExtractor.ProbeForValidation(ctx, filePath)
-			if err != nil {
-				return 0, err
-			}
-			return info.GetDuration(), nil
-		},
-		a.songService.UpdateSongDuration,
-	)
 	a.metadataRefresher = services.NewMetadataRefresher(
 		songRepo.ListSongsNeedingMetadata,
 		songRepo.UpdateMetadata,
+		songRepo.UpdateTagFields,
 		func(ctx context.Context, song *models.Song) (string, error) {
 			if song.IsPluginSourced() {
 				return a.cacheService.ResolveURL(ctx, song)
@@ -357,6 +348,17 @@ func (a *App) Init() error {
 			return song.URL, nil
 		},
 		a.metadataExtractor,
+	)
+	a.metadataRefresher.SetRemoteTitleSource(func() string {
+		return a.configService.GetString("remote_title_source", "filename")
+	})
+	a.cacheService.SetCacheCompleteCallback(
+		func(ctx context.Context, song *models.Song, filePath string) {
+			if !services.NeedsMetadata(song) {
+				return
+			}
+			a.metadataRefresher.RefreshSongFromFile(ctx, song, filePath)
+		},
 	)
 
 	// 初始化 Tracely 监控客户端（仅在编译时注入了 AppSecret 与 Host 时启用）

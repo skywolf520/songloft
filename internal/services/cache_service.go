@@ -13,6 +13,7 @@ import (
 	"sync"
 	"time"
 
+	"songloft/internal/httputil"
 	"songloft/internal/models"
 )
 
@@ -79,9 +80,7 @@ func NewCacheService(defaultCacheDir string, configService *ConfigService) *Cach
 		configService:   configService,
 		lruIndex:        make(map[string]time.Time),
 		transcodeSem:    make(chan struct{}, 1),
-		downloadClient: &http.Client{
-			Timeout: 120 * time.Second,
-		},
+		downloadClient: httputil.NewClient(120 * time.Second),
 	}
 	var cfg CacheConfig
 	if err := configService.GetJSON(cacheConfigKey, &cfg); err == nil && cfg.CacheDir != "" {

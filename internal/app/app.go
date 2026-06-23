@@ -308,6 +308,7 @@ func (a *App) Init() error {
 		Prober:        proberAdapter,
 		PluginInvoker: invokerAdapter,
 		Metrics:       a.sourceMetrics,
+		HTTPClient:    httputil.NewClient(120 * time.Second),
 		HTTPTimeout:   120 * time.Second,
 		LoadValidationOpts: func() source.ValidationOpts {
 			opts := source.DefaultValidationOpts()

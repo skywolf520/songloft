@@ -146,16 +146,8 @@ func ServeRemoteResource(w http.ResponseWriter, r *http.Request, resourceURL str
 	}
 	httputil.ApplyBasicAuthFromURL(upstreamReq)
 
-	// 发起请求
-	client := &http.Client{
-		Timeout: 60 * time.Second,
-		CheckRedirect: func(req *http.Request, via []*http.Request) error {
-			if len(via) >= 10 {
-				return http.ErrUseLastResponse
-			}
-			return nil
-		},
-	}
+	// 发起请求（走全局 HTTP 代理）
+	client := httputil.NewClient(60 * time.Second)
 
 	resp, err := client.Do(upstreamReq)
 	if err != nil {
@@ -215,15 +207,7 @@ func ServeRemoteResourceWithCache(
 	}
 	httputil.ApplyBasicAuthFromURL(upstreamReq)
 
-	client := &http.Client{
-		Timeout: 120 * time.Second,
-		CheckRedirect: func(req *http.Request, via []*http.Request) error {
-			if len(via) >= 10 {
-				return http.ErrUseLastResponse
-			}
-			return nil
-		},
-	}
+	client := httputil.NewClient(120 * time.Second)
 
 	resp, err := client.Do(upstreamReq)
 	if err != nil {

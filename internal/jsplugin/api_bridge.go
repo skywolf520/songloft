@@ -12,6 +12,7 @@ import (
 
 	"songloft/internal/database"
 	"songloft/internal/jsruntime"
+	"songloft/internal/models"
 	"songloft/internal/services"
 )
 
@@ -97,6 +98,18 @@ songloft.songs = {
         var data = JSON.stringify(Object.assign({song_id: songId}, options || {}));
         var s = await __callBridge('songs.download', data);
         return s ? JSON.parse(s) : null;
+    },
+    create: async function(songs) {
+        var s = await __callBridge('songs.create', JSON.stringify({songs: songs || []}));
+        return s ? JSON.parse(s) : [];
+    },
+    update: async function(id, fields) {
+        var data = JSON.stringify(Object.assign({id: id}, fields || {}));
+        var s = await __callBridge('songs.update', data);
+        return s ? JSON.parse(s) : null;
+    },
+    delete: async function(id) {
+        await __callBridge('songs.delete', JSON.stringify({id: id}));
     }
 };
 
@@ -113,6 +126,32 @@ songloft.playlists = {
     getSongs: async function(id, options) {
         var s = await __callBridge('playlists.getSongs', JSON.stringify({id: id, options: options || {}}));
         return s ? JSON.parse(s) : [];
+    },
+    search: async function(query, options) {
+        var s = await __callBridge('playlists.search', JSON.stringify({query: query, limit: (options && options.limit) || 0, offset: (options && options.offset) || 0}));
+        return s ? JSON.parse(s) : [];
+    },
+    create: async function(playlist) {
+        var s = await __callBridge('playlists.create', JSON.stringify(playlist || {}));
+        return s ? JSON.parse(s) : null;
+    },
+    update: async function(id, fields) {
+        var data = JSON.stringify(Object.assign({id: id}, fields || {}));
+        var s = await __callBridge('playlists.update', data);
+        return s ? JSON.parse(s) : null;
+    },
+    delete: async function(id) {
+        await __callBridge('playlists.delete', JSON.stringify({id: id}));
+    },
+    addSongs: async function(id, songIds) {
+        var s = await __callBridge('playlists.addSongs', JSON.stringify({id: id, songIds: songIds || []}));
+        return s ? JSON.parse(s) : {added: 0, skipped: 0};
+    },
+    removeSongs: async function(id, songIds) {
+        await __callBridge('playlists.removeSongs', JSON.stringify({id: id, songIds: songIds || []}));
+    },
+    reorder: async function(id, songIds) {
+        await __callBridge('playlists.reorder', JSON.stringify({id: id, songIds: songIds || []}));
     }
 };
 
@@ -262,28 +301,32 @@ func GetBootstrapCode() string {
 type BridgeHandler struct {
 	service                   *JSService
 	permissions               []string
-	dataDir                   string                   // data/jsplugins_data/
-	db                        database.DB              // 数据库访问（用于 songs/playlists 查询）
-	songDownloader            *services.SongDownloader // 歌曲下载服务（songs.download bridge 调用）
-	pluginToken               string                   // 插件专用的永久 JWT Token
-	port                      string                   // 服务器监听端口（用于构造宿主 URL）
-	processes                 sync.Map                 // map[name]*managedProcess — 后台进程跟踪
-	onPlayEventRegister       func(entryPath string)   // 播放事件订阅回调
-	onPlayEventUnregister     func(entryPath string)   // 播放事件取消订阅回调
-	onLyricProviderRegister   func(entryPath string)   // 歌词提供者注册回调
-	onLyricProviderUnregister func(entryPath string)   // 歌词提供者取消注册回调
+	dataDir                   string                    // data/jsplugins_data/
+	db                        database.DB               // 数据库访问（用于 songs/playlists 查询）
+	songDownloader            *services.SongDownloader  // 歌曲下载服务（songs.download bridge 调用）
+	songService               *services.SongService     // 歌曲服务（songs.create/update/delete）
+	playlistService           *services.PlaylistService // 歌单服务（playlists 写操作）
+	pluginToken               string                    // 插件专用的永久 JWT Token
+	port                      string                    // 服务器监听端口（用于构造宿主 URL）
+	processes                 sync.Map                  // map[name]*managedProcess — 后台进程跟踪
+	onPlayEventRegister       func(entryPath string)    // 播放事件订阅回调
+	onPlayEventUnregister     func(entryPath string)    // 播放事件取消订阅回调
+	onLyricProviderRegister   func(entryPath string)    // 歌词提供者注册回调
+	onLyricProviderUnregister func(entryPath string)    // 歌词提供者取消注册回调
 }
 
 // NewBridgeHandler 创建桥接处理器
-func NewBridgeHandler(service *JSService, dataDir string, db database.DB, songDownloader *services.SongDownloader, pluginToken string, port string) *BridgeHandler {
+func NewBridgeHandler(service *JSService, dataDir string, db database.DB, songDownloader *services.SongDownloader, songService *services.SongService, playlistService *services.PlaylistService, pluginToken string, port string) *BridgeHandler {
 	return &BridgeHandler{
-		service:        service,
-		permissions:    service.plugin.Permissions,
-		dataDir:        dataDir,
-		db:             db,
-		songDownloader: songDownloader,
-		pluginToken:    pluginToken,
-		port:           port,
+		service:         service,
+		permissions:     service.plugin.Permissions,
+		dataDir:         dataDir,
+		db:              db,
+		songDownloader:  songDownloader,
+		songService:     songService,
+		playlistService: playlistService,
+		pluginToken:     pluginToken,
+		port:            port,
 	}
 }
 
@@ -569,6 +612,118 @@ func (h *BridgeHandler) handleSongs(action, data string) (string, error) {
 		}
 		return string(result), nil
 
+	case "songs.create":
+		if h.songService == nil {
+			return "", fmt.Errorf("handleSongs: song service not configured")
+		}
+		var req struct {
+			Songs []struct {
+				URL            string  `json:"url"`
+				Title          string  `json:"title"`
+				Artist         string  `json:"artist"`
+				Album          string  `json:"album"`
+				CoverURL       string  `json:"coverUrl"`
+				Duration       float64 `json:"duration"`
+				SourceData     string  `json:"sourceData"`
+				DedupKey       string  `json:"dedupKey"`
+				Lyric          string  `json:"lyric"`
+				LyricSource    string  `json:"lyricSource"`
+				LyricRemoteURL string  `json:"lyricRemoteUrl"`
+			} `json:"songs"`
+		}
+		if err := json.Unmarshal([]byte(data), &req); err != nil {
+			return "", fmt.Errorf("handleSongs: parse create: %w", err)
+		}
+		inputs := make([]services.RemoteSongInput, len(req.Songs))
+		for i, s := range req.Songs {
+			inputs[i] = services.RemoteSongInput{
+				URL:             s.URL,
+				Title:           s.Title,
+				Artist:          s.Artist,
+				Album:           s.Album,
+				CoverURL:        s.CoverURL,
+				Duration:        s.Duration,
+				PluginEntryPath: h.service.plugin.EntryPath,
+				SourceData:      s.SourceData,
+				DedupKey:        s.DedupKey,
+				Lyric:           s.Lyric,
+				LyricSource:     s.LyricSource,
+				LyricRemoteURL:  s.LyricRemoteURL,
+			}
+		}
+		songs, err := h.songService.AddRemoteSongs(ctx, inputs)
+		if err != nil {
+			return "", fmt.Errorf("handleSongs: create: %w", err)
+		}
+		result, err := json.Marshal(songs)
+		if err != nil {
+			return "", fmt.Errorf("handleSongs: marshal create: %w", err)
+		}
+		return string(result), nil
+
+	case "songs.update":
+		if h.songService == nil {
+			return "", fmt.Errorf("handleSongs: song service not configured")
+		}
+		var req struct {
+			ID       int64    `json:"id"`
+			Title    *string  `json:"title"`
+			Artist   *string  `json:"artist"`
+			Album    *string  `json:"album"`
+			URL      *string  `json:"url"`
+			CoverURL *string  `json:"coverUrl"`
+			Duration *float64 `json:"duration"`
+		}
+		if err := json.Unmarshal([]byte(data), &req); err != nil {
+			return "", fmt.Errorf("handleSongs: parse update: %w", err)
+		}
+		song, err := h.db.SongRepository().GetByID(ctx, req.ID)
+		if err != nil {
+			return "", fmt.Errorf("handleSongs: update getById: %w", err)
+		}
+		if req.Title != nil {
+			song.Title = *req.Title
+		}
+		if req.Artist != nil {
+			song.Artist = *req.Artist
+		}
+		if req.Album != nil {
+			song.Album = *req.Album
+		}
+		if req.URL != nil {
+			song.URL = *req.URL
+		}
+		if req.CoverURL != nil {
+			song.CoverURL = *req.CoverURL
+		}
+		if req.Duration != nil {
+			song.Duration = *req.Duration
+		}
+		song.UpdatedAt = time.Now()
+		if err := h.songService.Update(ctx, song); err != nil {
+			return "", fmt.Errorf("handleSongs: update: %w", err)
+		}
+		result, err := json.Marshal(song)
+		if err != nil {
+			return "", fmt.Errorf("handleSongs: marshal update: %w", err)
+		}
+		return string(result), nil
+
+	case "songs.delete":
+		if h.songService == nil {
+			return "", fmt.Errorf("handleSongs: song service not configured")
+		}
+		var req struct {
+			ID int64 `json:"id"`
+		}
+		if err := json.Unmarshal([]byte(data), &req); err != nil {
+			return "", fmt.Errorf("handleSongs: parse delete: %w", err)
+		}
+		if err := h.songService.Delete(ctx, req.ID); err != nil {
+			return "", fmt.Errorf("handleSongs: delete: %w", err)
+		}
+		return "", nil
+
 	default:
 		return "", fmt.Errorf("handleSongs: unknown action: %s", action)
 	}
@@ -641,6 +796,169 @@ func (h *BridgeHandler) handlePlaylists(action, data string) (string, error) {
 			return "", fmt.Errorf("handlePlaylists: marshal getSongs: %w", err)
 		}
 		return string(result), nil
+
+	case "playlists.search":
+		var req struct {
+			Query  string `json:"query"`
+			Limit  int    `json:"limit"`
+			Offset int    `json:"offset"`
+		}
+		if err := json.Unmarshal([]byte(data), &req); err != nil {
+			return "", fmt.Errorf("handlePlaylists: parse search: %w", err)
+		}
+		if req.Limit <= 0 {
+			req.Limit = 20
+		}
+		filter := &database.PlaylistFilter{
+			Keyword: req.Query,
+			Limit:   req.Limit,
+			Offset:  req.Offset,
+		}
+		playlists, err := h.db.PlaylistRepository().List(ctx, filter)
+		if err != nil {
+			return "", fmt.Errorf("handlePlaylists: search: %w", err)
+		}
+		result, err := json.Marshal(playlists)
+		if err != nil {
+			return "", fmt.Errorf("handlePlaylists: marshal search: %w", err)
+		}
+		return string(result), nil
+
+	case "playlists.create":
+		if h.playlistService == nil {
+			return "", fmt.Errorf("handlePlaylists: playlist service not configured")
+		}
+		var req struct {
+			Name        string `json:"name"`
+			Type        string `json:"type"`
+			Description string `json:"description"`
+			CoverURL    string `json:"coverUrl"`
+		}
+		if err := json.Unmarshal([]byte(data), &req); err != nil {
+			return "", fmt.Errorf("handlePlaylists: parse create: %w", err)
+		}
+		playlist := &models.Playlist{
+			Name:        req.Name,
+			Type:        req.Type,
+			Description: req.Description,
+			CoverURL:    req.CoverURL,
+		}
+		if playlist.Type == "" {
+			playlist.Type = "normal"
+		}
+		if err := h.playlistService.Create(ctx, playlist); err != nil {
+			return "", fmt.Errorf("handlePlaylists: create: %w", err)
+		}
+		result, err := json.Marshal(playlist)
+		if err != nil {
+			return "", fmt.Errorf("handlePlaylists: marshal create: %w", err)
+		}
+		return string(result), nil
+
+	case "playlists.update":
+		if h.playlistService == nil {
+			return "", fmt.Errorf("handlePlaylists: playlist service not configured")
+		}
+		var req struct {
+			ID          int64   `json:"id"`
+			Name        *string `json:"name"`
+			Description *string `json:"description"`
+			CoverURL    *string `json:"coverUrl"`
+		}
+		if err := json.Unmarshal([]byte(data), &req); err != nil {
+			return "", fmt.Errorf("handlePlaylists: parse update: %w", err)
+		}
+		playlist, err := h.db.PlaylistRepository().GetByID(ctx, req.ID)
+		if err != nil {
+			return "", fmt.Errorf("handlePlaylists: update getById: %w", err)
+		}
+		if req.Name != nil {
+			playlist.Name = *req.Name
+		}
+		if req.Description != nil {
+			playlist.Description = *req.Description
+		}
+		if req.CoverURL != nil {
+			playlist.CoverURL = *req.CoverURL
+		}
+		if err := h.playlistService.Update(ctx, playlist); err != nil {
+			return "", fmt.Errorf("handlePlaylists: update: %w", err)
+		}
+		result, err := json.Marshal(playlist)
+		if err != nil {
+			return "", fmt.Errorf("handlePlaylists: marshal update: %w", err)
+		}
+		return string(result), nil
+
+	case "playlists.delete":
+		if h.playlistService == nil {
+			return "", fmt.Errorf("handlePlaylists: playlist service not configured")
+		}
+		var req struct {
+			ID int64 `json:"id"`
+		}
+		if err := json.Unmarshal([]byte(data), &req); err != nil {
+			return "", fmt.Errorf("handlePlaylists: parse delete: %w", err)
+		}
+		if err := h.playlistService.Delete(ctx, req.ID); err != nil {
+			return "", fmt.Errorf("handlePlaylists: delete: %w", err)
+		}
+		return "", nil
+
+	case "playlists.addSongs":
+		if h.playlistService == nil {
+			return "", fmt.Errorf("handlePlaylists: playlist service not configured")
+		}
+		var req struct {
+			ID      int64   `json:"id"`
+			SongIDs []int64 `json:"songIds"`
+		}
+		if err := json.Unmarshal([]byte(data), &req); err != nil {
+			return "", fmt.Errorf("handlePlaylists: parse addSongs: %w", err)
+		}
+		added, skipped, err := h.playlistService.AddSongs(ctx, req.ID, req.SongIDs)
+		if err != nil {
+			return "", fmt.Errorf("handlePlaylists: addSongs: %w", err)
+		}
+		result, err := json.Marshal(map[string]int{"added": added, "skipped": skipped})
+		if err != nil {
+			return "", fmt.Errorf("handlePlaylists: marshal addSongs: %w", err)
+		}
+		return string(result), nil
+
+	case "playlists.removeSongs":
+		if h.playlistService == nil {
+			return "", fmt.Errorf("handlePlaylists: playlist service not configured")
+		}
+		var req struct {
+			ID      int64   `json:"id"`
+			SongIDs []int64 `json:"songIds"`
+		}
+		if err := json.Unmarshal([]byte(data), &req); err != nil {
+			return "", fmt.Errorf("handlePlaylists: parse removeSongs: %w", err)
+		}
+		for _, songID := range req.SongIDs {
+			if err := h.playlistService.RemoveSong(ctx, req.ID, songID); err != nil {
+				return "", fmt.Errorf("handlePlaylists: removeSongs (songId=%d): %w", songID, err)
+			}
+		}
+		return "", nil
+
+	case "playlists.reorder":
+		if h.playlistService == nil {
+			return "", fmt.Errorf("handlePlaylists: playlist service not configured")
+		}
+		var req struct {
+			ID      int64   `json:"id"`
+			SongIDs []int64 `json:"songIds"`
+		}
+		if err := json.Unmarshal([]byte(data), &req); err != nil {
+			return "", fmt.Errorf("handlePlaylists: parse reorder: %w", err)
+		}
+		if err := h.playlistService.ReorderSongs(ctx, req.ID, req.SongIDs); err != nil {
+			return "", fmt.Errorf("handlePlaylists: reorder: %w", err)
+		}
+		return "", nil
 
 	default:
 		return "", fmt.Errorf("handlePlaylists: unknown action: %s", action)

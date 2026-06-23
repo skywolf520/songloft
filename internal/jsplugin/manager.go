@@ -37,24 +37,26 @@ var (
 
 // Manager 是 JS 插件系统的入口和协调器
 type Manager struct {
-	repo           Repository
-	packager       *PackageManager // 用于启动时从本地 zip 文件重建插件记录
-	scheduler      *ServiceScheduler
-	jsManager      *jsruntime.JSEnvManager
-	services       sync.Map // map[string]*JSService (entryPath -> service)
-	pluginsDir     string   // data/jsplugins/
-	pluginsDataDir string   // data/jsplugins_data/
-	basePath       string   // URL 基础路径，用于反向代理子路径部署
-	router         chi.Router
-	db             database.DB              // 数据库访问
-	authService    *services.AuthService    // 用于生成插件 JWT Token
-	songDownloader *services.SongDownloader // 歌曲下载服务（bridge songs.download 用）
-	pluginToken    string                   // 插件专用的永久 JWT Token（启动时生成一次）
-	port           string                   // 服务器监听端口
-	healthChecker  *HealthChecker
-	hotReloader    *HotReloader
-	cancelFunc     context.CancelFunc
-	mu             sync.RWMutex
+	repo            Repository
+	packager        *PackageManager // 用于启动时从本地 zip 文件重建插件记录
+	scheduler       *ServiceScheduler
+	jsManager       *jsruntime.JSEnvManager
+	services        sync.Map // map[string]*JSService (entryPath -> service)
+	pluginsDir      string   // data/jsplugins/
+	pluginsDataDir  string   // data/jsplugins_data/
+	basePath        string   // URL 基础路径，用于反向代理子路径部署
+	router          chi.Router
+	db              database.DB               // 数据库访问
+	authService     *services.AuthService     // 用于生成插件 JWT Token
+	songDownloader  *services.SongDownloader  // 歌曲下载服务（bridge songs.download 用）
+	songService     *services.SongService     // 歌曲服务（bridge songs.create/update/delete 用）
+	playlistService *services.PlaylistService // 歌单服务（bridge playlists.* 写操作用）
+	pluginToken     string                    // 插件专用的永久 JWT Token（启动时生成一次）
+	port            string                    // 服务器监听端口
+	healthChecker   *HealthChecker
+	hotReloader     *HotReloader
+	cancelFunc      context.CancelFunc
+	mu              sync.RWMutex
 	// loadGroup 对懒加载/恢复加载按 entryPath 去重并发，
 	// 避免同一插件因高并发请求被并行 LoadPlugin 多次（hash 反复校验、scheduler 重复注册等）。
 	loadGroup            singleflight.Group
@@ -146,6 +148,12 @@ func (m *Manager) SetSongDownloader(d *services.SongDownloader) {
 	m.songDownloader = d
 }
 
+// SetServices 注入歌曲和歌单服务（bridge songs/playlists 写操作调用）。
+func (m *Manager) SetServices(songService *services.SongService, playlistService *services.PlaylistService) {
+	m.songService = songService
+	m.playlistService = playlistService
+}
+
 // Start 启动 JS 插件管理器（清理旧数据 → 重建 → 加载插件 → 健康检查 → 热更新监控）
 func (m *Manager) Start(ctx context.Context) error {
 	// 创建 HealthChecker 和 HotReloader
@@ -230,7 +238,7 @@ func (m *Manager) LoadPlugin(ctx context.Context, plugin *JSPlugin) error {
 	service := NewJSService(plugin, m.scheduler, m.jsManager)
 
 	// 2. 创建并关联 BridgeHandler
-	bridgeHandler := NewBridgeHandler(service, dataDir, m.db, m.songDownloader, m.pluginToken, m.getPort())
+	bridgeHandler := NewBridgeHandler(service, dataDir, m.db, m.songDownloader, m.songService, m.playlistService, m.pluginToken, m.getPort())
 	bridgeHandler.onPlayEventRegister = m.RegisterPlayEvent
 	bridgeHandler.onPlayEventUnregister = m.UnregisterPlayEvent
 	bridgeHandler.onLyricProviderRegister = m.RegisterLyricProvider

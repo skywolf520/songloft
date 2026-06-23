@@ -40,12 +40,12 @@ type MetadataRefresher struct {
 	progress MetadataRefreshProgress
 	cancelFn context.CancelFunc
 
-	listSongs          func(ctx context.Context) ([]sqlc.ListSongsNeedingMetadataRow, error)
-	updateMeta         func(ctx context.Context, params sqlc.UpdateSongMetadataParams) error
-	updateTags         func(ctx context.Context, params sqlc.UpdateSongTagFieldsParams) error
-	resolveURL         func(ctx context.Context, song *models.Song) (string, error)
-	extractor          *MetadataExtractor
-	remoteTitleSource  func() string // "tag": 用标签覆盖 title; "filename"(默认): 不覆盖
+	listSongs         func(ctx context.Context) ([]sqlc.ListSongsNeedingMetadataRow, error)
+	updateMeta        func(ctx context.Context, params sqlc.UpdateSongMetadataParams) error
+	updateTags        func(ctx context.Context, params sqlc.UpdateSongTagFieldsParams) error
+	resolveURL        func(ctx context.Context, song *models.Song) (string, error)
+	extractor         *MetadataExtractor
+	remoteTitleSource func() string // "tag": 用标签覆盖 title; "filename"(默认): 不覆盖
 
 	refreshInflight sync.Map // songID -> struct{}, 防止同一首歌并发提取
 }

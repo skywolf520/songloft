@@ -178,7 +178,7 @@ songloft.exe -password your_secure_password
 
 ### Q: 支持哪些音乐文件格式？
 
-A: 支持主流音频格式：**MP3、FLAC、WAV、APE、OGG、M4A、WMA** 等。可通过数据库配置 `scan_config` 自定义支持的格式列表。
+A: 支持主流音频格式：**MP3、FLAC、WAV、APE、OGG、M4A、WMA、AIF/AIFF** 等。可通过数据库配置 `scan_config` 自定义支持的格式列表。
 
 ### Q: 如何查看当前版本？
 

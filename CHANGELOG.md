@@ -1,3 +1,11 @@
+## [v2.8.10] - 2026-06-24
+### :memo: Documentation Changes
+- [`e015dba`](https://github.com/songloft-org/songloft/commit/e015dba42403d68c72a94c2dafebcee132361e77) - update CHANGELOG for v2.8.9 *(commit by [@github-actions[bot]](https://github.com/apps/github-actions))*
+
+### :wrench: Chores
+- [`717c5eb`](https://github.com/songloft-org/songloft/commit/717c5eb9251e1dd7ec72f08f59f020b98a9be00b) - release version 2.8.10 *(commit by [@hanxi](https://github.com/hanxi))*
+
+
 ## [v2.8.9] - 2026-06-24
 ### :sparkles: New Features
 - [`34a6e4c`](https://github.com/songloft-org/songloft/commit/34a6e4ca1a93d92e9a44d95168e9663a5b832bfd) - remote 歌曲播放时自动提取元数据 *(commit by [@hanxi](https://github.com/hanxi))*
@@ -1428,3 +1436,4 @@
 [v2.8.7]: https://github.com/songloft-org/songloft/compare/v2.8.6...v2.8.7
 [v2.8.8]: https://github.com/songloft-org/songloft/compare/v2.8.7...v2.8.8
 [v2.8.9]: https://github.com/songloft-org/songloft/compare/v2.8.8...v2.8.9
+[v2.8.10]: https://github.com/songloft-org/songloft/compare/v2.8.9...v2.8.10

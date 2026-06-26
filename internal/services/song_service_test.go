@@ -139,26 +139,26 @@ func TestSongServiceScanAndImportNote(t *testing.T) {
 
 // stubPlaylistAutoCreator 记录 AutoCreate 的调用参数，用于验证扫描完成后的串接逻辑。
 type stubPlaylistAutoCreator struct {
-	calls       int
-	lastInclude bool
-	returnErr   error
+	calls     int
+	lastMode  string
+	returnErr error
 }
 
-func (s *stubPlaylistAutoCreator) AutoCreate(ctx context.Context, includeSubdirs bool, excludeDirs []string) (*models.AutoCreatePlaylistsResponse, error) {
+func (s *stubPlaylistAutoCreator) AutoCreate(ctx context.Context, playlistMode string, excludeDirs []string) (*models.AutoCreatePlaylistsResponse, error) {
 	s.calls++
-	s.lastInclude = includeSubdirs
+	s.lastMode = playlistMode
 	if s.returnErr != nil {
 		return nil, s.returnErr
 	}
 	return &models.AutoCreatePlaylistsResponse{}, nil
 }
 
-// TestRunAutoCreatePlaylistsReadsConfig 验证扫描完成后会按配置 includeSubdirs 调用 AutoCreate，并切到 creating_playlists 阶段。
+// TestRunAutoCreatePlaylistsReadsConfig 验证扫描完成后会按配置 playlistMode 调用 AutoCreate，并切到 creating_playlists 阶段。
 func TestRunAutoCreatePlaylistsReadsConfig(t *testing.T) {
 	repo := newTestSongRepo(t)
 	mdb := testutil.OpenMemoryDB(t)
 	configService := NewConfigService(mdb.ConfigRepository())
-	if err := configService.Set("scan_auto_create_include_subdirs", "true"); err != nil {
+	if err := configService.Set("scan_playlist_mode", "bubble_up"); err != nil {
 		t.Fatalf("set config: %v", err)
 	}
 
@@ -170,8 +170,8 @@ func TestRunAutoCreatePlaylistsReadsConfig(t *testing.T) {
 	if stub.calls != 1 {
 		t.Fatalf("AutoCreate calls = %d, want 1", stub.calls)
 	}
-	if !stub.lastInclude {
-		t.Errorf("AutoCreate includeSubdirs = false, want true")
+	if stub.lastMode != "bubble_up" {
+		t.Errorf("AutoCreate playlistMode = %q, want bubble_up", stub.lastMode)
 	}
 	if got := service.scanProgressManager.GetProgress().Status; got != ScanStatusCreatingPlaylists {
 		t.Errorf("scan status = %v, want %v", got, ScanStatusCreatingPlaylists)

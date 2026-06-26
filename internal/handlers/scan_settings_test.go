@@ -100,33 +100,44 @@ func TestMusicPathSetting_EmptyPathRejected(t *testing.T) {
 	}
 }
 
-// TestAutoCreateSubdirsSetting_RoundTrip GET 默认 false，PUT true 后读到 true。
-func TestAutoCreateSubdirsSetting_RoundTrip(t *testing.T) {
+// TestPlaylistModeSetting_RoundTrip GET 默认 directory，PUT top_level 后读到 top_level。
+func TestPlaylistModeSetting_RoundTrip(t *testing.T) {
 	h := newTestScanHandlerWithConfig(t)
 
-	// 默认 false
+	// 默认 directory
 	rr := httptest.NewRecorder()
-	h.GetAutoCreateIncludeSubdirsSetting(rr, httptest.NewRequest("GET", "/api/v1/settings/scan-auto-create-include-subdirs", nil))
-	var resp map[string]bool
+	h.GetPlaylistModeSetting(rr, httptest.NewRequest("GET", "/api/v1/settings/scan-playlist-mode", nil))
+	var resp map[string]string
 	json.Unmarshal(rr.Body.Bytes(), &resp)
-	if resp["enabled"] != false {
-		t.Errorf("default: got %v want false", resp["enabled"])
+	if resp["mode"] != "directory" {
+		t.Errorf("default: got %q want directory", resp["mode"])
 	}
 
-	// PUT true
+	// PUT top_level
 	rr2 := httptest.NewRecorder()
-	h.UpdateAutoCreateIncludeSubdirsSetting(rr2, httptest.NewRequest("PUT", "/api/v1/settings/test",
-		strings.NewReader(`{"enabled":true}`)))
+	h.UpdatePlaylistModeSetting(rr2, httptest.NewRequest("PUT", "/api/v1/settings/scan-playlist-mode",
+		strings.NewReader(`{"mode":"top_level"}`)))
 	if rr2.Code != http.StatusOK {
 		t.Fatalf("PUT status: %d", rr2.Code)
 	}
 
-	// GET 应为 true
+	// GET 应为 top_level
 	rr3 := httptest.NewRecorder()
-	h.GetAutoCreateIncludeSubdirsSetting(rr3, httptest.NewRequest("GET", "/api/v1/settings/scan-auto-create-include-subdirs", nil))
+	h.GetPlaylistModeSetting(rr3, httptest.NewRequest("GET", "/api/v1/settings/scan-playlist-mode", nil))
 	json.Unmarshal(rr3.Body.Bytes(), &resp)
-	if resp["enabled"] != true {
-		t.Errorf("after PUT true: got %v want true", resp["enabled"])
+	if resp["mode"] != "top_level" {
+		t.Errorf("after PUT: got %q want top_level", resp["mode"])
+	}
+}
+
+// TestPlaylistModeSetting_InvalidMode PUT 非法 mode 返回 400。
+func TestPlaylistModeSetting_InvalidMode(t *testing.T) {
+	h := newTestScanHandlerWithConfig(t)
+	rr := httptest.NewRecorder()
+	h.UpdatePlaylistModeSetting(rr, httptest.NewRequest("PUT", "/api/v1/settings/scan-playlist-mode",
+		strings.NewReader(`{"mode":"invalid"}`)))
+	if rr.Code != http.StatusBadRequest {
+		t.Errorf("invalid mode: got %d want 400", rr.Code)
 	}
 }
 
@@ -139,7 +150,7 @@ func TestScanSettings_BadJSON(t *testing.T) {
 		fn   func(http.ResponseWriter, *http.Request)
 	}{
 		{"music-path", h.UpdateMusicPathSetting},
-		{"scan-auto-create", h.UpdateAutoCreateIncludeSubdirsSetting},
+		{"playlist-mode", h.UpdatePlaylistModeSetting},
 	} {
 		rr := httptest.NewRecorder()
 		tc.fn(rr, httptest.NewRequest("PUT", "/api/v1/settings/test", strings.NewReader(`not json`)))

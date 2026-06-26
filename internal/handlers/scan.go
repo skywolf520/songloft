@@ -6,14 +6,14 @@ import (
 	"path/filepath"
 	"strings"
 
+	"songloft/internal/models"
 	"songloft/internal/services"
 )
 
 // ScanHandler 扫描处理器
 //
-// 除扫描动作外，还承载扫描相关业务设置端点（/settings/music-path 与
-// /settings/scan-auto-create-include-subdirs），把 music_path /
-// scan_auto_create_include_subdirs 两个 config key 的"业务化"读写收敛在此。
+// 除扫描动作外，还承载扫描相关业务设置端点（/settings/music-path、
+// /settings/scan-playlist-mode 等），把扫描相关 config key 的"业务化"读写收敛在此。
 type ScanHandler struct {
 	songService        *services.SongService
 	scanner            *services.Scanner
@@ -203,7 +203,7 @@ func (h *ScanHandler) ListDirNames(w http.ResponseWriter, r *http.Request) {
 const (
 	autoScanConfigKey                = "auto_scan"
 	musicPathConfigKey               = "music_path"
-	scanAutoCreateSubdirsConfigKey   = "scan_auto_create_include_subdirs"
+	scanPlaylistModeConfigKey        = "scan_playlist_mode"
 	scanAutoCreatePlaylistsConfigKey = "scan_auto_create_playlists"
 	scanTitleSourceConfigKey         = "scan_title_source"
 )
@@ -290,56 +290,65 @@ func (h *ScanHandler) UpdateMusicPathSetting(w http.ResponseWriter, r *http.Requ
 	respondJSON(w, http.StatusOK, req)
 }
 
-// scanAutoCreateSubdirsRequest /settings/scan-auto-create-include-subdirs PUT 请求体
-type scanAutoCreateSubdirsRequest struct {
-	Enabled bool `json:"enabled"`
+// scanPlaylistModeRequest /settings/scan-playlist-mode PUT 请求体
+type scanPlaylistModeRequest struct {
+	Mode string `json:"mode" example:"directory" enums:"directory,top_level,bubble_up"`
 }
 
-// GetAutoCreateIncludeSubdirsSetting GET /api/v1/settings/scan-auto-create-include-subdirs
-// @Summary 获取「扫描后自动创建歌单是否包含子目录」开关
+// scanPlaylistModeResponse /settings/scan-playlist-mode 响应体
+type scanPlaylistModeResponse struct {
+	Mode string `json:"mode" example:"directory"`
+}
+
+// GetPlaylistModeSetting GET /api/v1/settings/scan-playlist-mode
+// @Summary 获取歌单创建方式
+// @Description 返回扫描后自动创建歌单的目录归并模式。directory：每个文件夹生成独立歌单；top_level：按一级子目录合并歌单；bubble_up：歌曲同时出现在所有上级文件夹歌单。默认 directory。
 // @Tags 扫描管理
 // @Produce json
-// @Success 200 {object} map[string]bool "返回 enabled 字段"
+// @Success 200 {object} scanPlaylistModeResponse "返回 mode 字段"
 // @Security BearerAuth
-// @Router /settings/scan-auto-create-include-subdirs [get]
-func (h *ScanHandler) GetAutoCreateIncludeSubdirsSetting(w http.ResponseWriter, r *http.Request) {
-	enabled := false
+// @Router /settings/scan-playlist-mode [get]
+func (h *ScanHandler) GetPlaylistModeSetting(w http.ResponseWriter, r *http.Request) {
+	mode := models.PlaylistModeDirectory
 	if h.configService != nil {
-		enabled = h.configService.GetBool(scanAutoCreateSubdirsConfigKey, false)
+		mode = h.configService.GetString(scanPlaylistModeConfigKey, models.PlaylistModeDirectory)
 	}
-	respondJSON(w, http.StatusOK, map[string]bool{"enabled": enabled})
+	respondJSON(w, http.StatusOK, scanPlaylistModeResponse{Mode: mode})
 }
 
-// UpdateAutoCreateIncludeSubdirsSetting PUT /api/v1/settings/scan-auto-create-include-subdirs
-// @Summary 更新「扫描后自动创建歌单是否包含子目录」开关
+// UpdatePlaylistModeSetting PUT /api/v1/settings/scan-playlist-mode
+// @Summary 更新歌单创建方式
+// @Description 设置扫描后自动创建歌单的目录归并模式。directory：每个文件夹生成独立歌单；top_level：按一级子目录合并歌单；bubble_up：歌曲同时出现在所有上级文件夹歌单。
 // @Tags 扫描管理
 // @Accept json
 // @Produce json
-// @Param request body scanAutoCreateSubdirsRequest true "开关请求"
-// @Success 200 {object} map[string]bool "返回 enabled 字段"
-// @Failure 400 {object} map[string]string "请求格式错误"
+// @Param request body scanPlaylistModeRequest true "模式请求"
+// @Success 200 {object} scanPlaylistModeResponse "返回 mode 字段"
+// @Failure 400 {object} map[string]string "请求格式错误或 mode 值非法"
 // @Failure 500 {object} map[string]string "保存配置失败"
 // @Security BearerAuth
-// @Router /settings/scan-auto-create-include-subdirs [put]
-func (h *ScanHandler) UpdateAutoCreateIncludeSubdirsSetting(w http.ResponseWriter, r *http.Request) {
+// @Router /settings/scan-playlist-mode [put]
+func (h *ScanHandler) UpdatePlaylistModeSetting(w http.ResponseWriter, r *http.Request) {
 	if h.configService == nil {
 		respondError(w, http.StatusInternalServerError, "configService 未注入", nil)
 		return
 	}
-	var req scanAutoCreateSubdirsRequest
+	var req scanPlaylistModeRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		respondError(w, http.StatusBadRequest, "请求格式错误", err)
 		return
 	}
-	val := "false"
-	if req.Enabled {
-		val = "true"
+	switch req.Mode {
+	case models.PlaylistModeDirectory, models.PlaylistModeTopLevel, models.PlaylistModeBubbleUp:
+	default:
+		respondError(w, http.StatusBadRequest, "mode 值非法，可选：directory / top_level / bubble_up", nil)
+		return
 	}
-	if err := h.configService.Set(scanAutoCreateSubdirsConfigKey, val); err != nil {
+	if err := h.configService.Set(scanPlaylistModeConfigKey, req.Mode); err != nil {
 		respondError(w, http.StatusInternalServerError, "保存配置失败", err)
 		return
 	}
-	respondJSON(w, http.StatusOK, map[string]bool{"enabled": req.Enabled})
+	respondJSON(w, http.StatusOK, scanPlaylistModeResponse{Mode: req.Mode})
 }
 
 // scanAutoCreatePlaylistsRequest /settings/scan-auto-create-playlists PUT 请求体

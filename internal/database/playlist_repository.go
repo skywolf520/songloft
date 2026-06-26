@@ -279,8 +279,9 @@ func (r *PlaylistRepository) BatchUpdatePositions(ctx context.Context, playlistI
 
 // AutoCreate 根据本地歌曲的目录结构批量生成歌单，并把每首歌写入对应歌单。
 // 写操作集中在单一事务里：清理旧的 auto_created 歌单 → 插入新歌单 → 批量插入 playlist_songs。
+// playlistMode: "directory"（按文件夹）、"top_level"（按顶层文件夹合并）、"bubble_up"（向上冒泡）。
 // excludeDirs 指定在自动创建歌单时要排除的目录名称（按名称匹配，路径中任何层级包含该名称都会被排除）。
-func (r *PlaylistRepository) AutoCreate(ctx context.Context, includeSubdirs bool, excludeDirs []string) (*models.AutoCreatePlaylistsResponse, error) {
+func (r *PlaylistRepository) AutoCreate(ctx context.Context, playlistMode string, excludeDirs []string) (*models.AutoCreatePlaylistsResponse, error) {
 	songRepo := NewSongRepository(r.db)
 	songs, err := songRepo.List(ctx, &SongFilter{
 		Type:  models.TypeLocal,
@@ -325,8 +326,17 @@ func (r *PlaylistRepository) AutoCreate(ctx context.Context, includeSubdirs bool
 		if shouldExcludeDir(dir) {
 			continue
 		}
-		dirToSongs[dir] = append(dirToSongs[dir], song.ID)
-		if includeSubdirs {
+
+		switch playlistMode {
+		case models.PlaylistModeTopLevel:
+			parts := strings.SplitN(dir, "/", 2)
+			topLevel := parts[0]
+			if topLevel == "." {
+				topLevel = dir
+			}
+			dirToSongs[topLevel] = append(dirToSongs[topLevel], song.ID)
+		case models.PlaylistModeBubbleUp:
+			dirToSongs[dir] = append(dirToSongs[dir], song.ID)
 			parent := filepath.Dir(dir)
 			for parent != "." && parent != "/" && parent != dir {
 				parent = filepath.ToSlash(parent)
@@ -335,6 +345,8 @@ func (r *PlaylistRepository) AutoCreate(ctx context.Context, includeSubdirs bool
 				}
 				parent = filepath.Dir(parent)
 			}
+		default:
+			dirToSongs[dir] = append(dirToSongs[dir], song.ID)
 		}
 	}
 

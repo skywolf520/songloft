@@ -4115,90 +4115,6 @@ const docTemplate = `{
                 }
             }
         },
-        "/settings/scan-auto-create-include-subdirs": {
-            "get": {
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "扫描管理"
-                ],
-                "summary": "获取「扫描后自动创建歌单是否包含子目录」开关",
-                "responses": {
-                    "200": {
-                        "description": "返回 enabled 字段",
-                        "schema": {
-                            "type": "object",
-                            "additionalProperties": {
-                                "type": "boolean"
-                            }
-                        }
-                    }
-                }
-            },
-            "put": {
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ],
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "扫描管理"
-                ],
-                "summary": "更新「扫描后自动创建歌单是否包含子目录」开关",
-                "parameters": [
-                    {
-                        "description": "开关请求",
-                        "name": "request",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/handlers.scanAutoCreateSubdirsRequest"
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "返回 enabled 字段",
-                        "schema": {
-                            "type": "object",
-                            "additionalProperties": {
-                                "type": "boolean"
-                            }
-                        }
-                    },
-                    "400": {
-                        "description": "请求格式错误",
-                        "schema": {
-                            "type": "object",
-                            "additionalProperties": {
-                                "type": "string"
-                            }
-                        }
-                    },
-                    "500": {
-                        "description": "保存配置失败",
-                        "schema": {
-                            "type": "object",
-                            "additionalProperties": {
-                                "type": "string"
-                            }
-                        }
-                    }
-                }
-            }
-        },
         "/settings/scan-auto-create-playlists": {
             "get": {
                 "security": [
@@ -4266,6 +4182,86 @@ const docTemplate = `{
                     },
                     "400": {
                         "description": "请求格式错误",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "保存配置失败",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/settings/scan-playlist-mode": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "返回扫描后自动创建歌单的目录归并模式。directory：每个文件夹生成独立歌单；top_level：按一级子目录合并歌单；bubble_up：歌曲同时出现在所有上级文件夹歌单。默认 directory。",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "扫描管理"
+                ],
+                "summary": "获取歌单创建方式",
+                "responses": {
+                    "200": {
+                        "description": "返回 mode 字段",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.scanPlaylistModeResponse"
+                        }
+                    }
+                }
+            },
+            "put": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "设置扫描后自动创建歌单的目录归并模式。directory：每个文件夹生成独立歌单；top_level：按一级子目录合并歌单；bubble_up：歌曲同时出现在所有上级文件夹歌单。",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "扫描管理"
+                ],
+                "summary": "更新歌单创建方式",
+                "parameters": [
+                    {
+                        "description": "模式请求",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/handlers.scanPlaylistModeRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "返回 mode 字段",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.scanPlaylistModeResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "请求格式错误或 mode 值非法",
                         "schema": {
                             "type": "object",
                             "additionalProperties": {
@@ -6487,11 +6483,26 @@ const docTemplate = `{
                 }
             }
         },
-        "handlers.scanAutoCreateSubdirsRequest": {
+        "handlers.scanPlaylistModeRequest": {
             "type": "object",
             "properties": {
-                "enabled": {
-                    "type": "boolean"
+                "mode": {
+                    "type": "string",
+                    "enum": [
+                        "directory",
+                        "top_level",
+                        "bubble_up"
+                    ],
+                    "example": "directory"
+                }
+            }
+        },
+        "handlers.scanPlaylistModeResponse": {
+            "type": "object",
+            "properties": {
+                "mode": {
+                    "type": "string",
+                    "example": "directory"
                 }
             }
         },

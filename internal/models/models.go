@@ -494,6 +494,10 @@ type AutoCreatePlaylistsResponse struct {
 const (
 	PlaylistLabelAutoCreated = "auto_created" // 自动创建歌单标签
 	PlaylistLabelBuiltIn     = "built_in"     // 内置歌单标签（不可删除）
+
+	PlaylistModeDirectory = "directory" // 每个文件夹生成独立歌单
+	PlaylistModeTopLevel  = "top_level" // 按一级子目录合并歌单
+	PlaylistModeBubbleUp  = "bubble_up" // 歌曲同时出现在所有上级文件夹歌单
 )
 
 // BatchDeleteSongsRequest 批量删除歌曲请求

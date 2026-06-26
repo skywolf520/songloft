@@ -405,7 +405,7 @@ func TestAutoCreatePlaylistsAvoidsManualNameConflict(t *testing.T) {
 		t.Fatalf("BatchCreateSongs error = %v", err)
 	}
 
-	resp, err := db.PlaylistRepository().AutoCreate(ctx, false, nil)
+	resp, err := db.PlaylistRepository().AutoCreate(ctx, models.PlaylistModeDirectory, nil)
 	if err != nil {
 		t.Fatalf("AutoCreatePlaylists error = %v", err)
 	}
@@ -421,7 +421,7 @@ func TestAutoCreatePlaylistsAvoidsManualNameConflict(t *testing.T) {
 	}
 
 	// 再跑一次:旧的 auto_created 会被 DELETE,新建仍然应消歧成相同后缀,不应递增到 (自动 2)
-	resp2, err := db.PlaylistRepository().AutoCreate(ctx, false, nil)
+	resp2, err := db.PlaylistRepository().AutoCreate(ctx, models.PlaylistModeDirectory, nil)
 	if err != nil {
 		t.Fatalf("second AutoCreatePlaylists error = %v", err)
 	}

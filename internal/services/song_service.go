@@ -52,7 +52,7 @@ type Transactor interface {
 
 // PlaylistAutoCreator 由扫描完成后调用，重建 auto_created 歌单。
 type PlaylistAutoCreator interface {
-	AutoCreate(ctx context.Context, includeSubdirs bool, excludeDirs []string) (*models.AutoCreatePlaylistsResponse, error)
+	AutoCreate(ctx context.Context, playlistMode string, excludeDirs []string) (*models.AutoCreatePlaylistsResponse, error)
 }
 
 // SongService 歌曲服务
@@ -510,7 +510,7 @@ func (s *SongService) doScanAndImport(ctx context.Context, reimport bool) {
 	s.runAutoFingerprint()
 }
 
-// runAutoCreatePlaylists 扫描完成后按当前 includeSubdirs 配置重建 auto_created 歌单。
+// runAutoCreatePlaylists 扫描完成后按当前 playlistMode 配置重建 auto_created 歌单。
 // 失败仅记录日志，不影响扫描的「完成」状态——下次扫描会再次尝试。
 func (s *SongService) runAutoCreatePlaylists(ctx context.Context) {
 	if s.playlistAutoCreator == nil {
@@ -518,10 +518,10 @@ func (s *SongService) runAutoCreatePlaylists(ctx context.Context) {
 	}
 	s.scanProgressManager.BeginCreatingPlaylists()
 
-	includeSubdirs := false
+	playlistMode := models.PlaylistModeDirectory
 	var autoCreateExcludeDirs []string
 	if s.configService != nil {
-		includeSubdirs = s.configService.GetBool("scan_auto_create_include_subdirs", false)
+		playlistMode = s.configService.GetString("scan_playlist_mode", models.PlaylistModeDirectory)
 		var cfg struct {
 			AutoCreateExcludeDirs []string `json:"auto_create_exclude_dirs"`
 		}
@@ -529,8 +529,8 @@ func (s *SongService) runAutoCreatePlaylists(ctx context.Context) {
 		autoCreateExcludeDirs = cfg.AutoCreateExcludeDirs
 	}
 
-	if _, err := s.playlistAutoCreator.AutoCreate(ctx, includeSubdirs, autoCreateExcludeDirs); err != nil {
-		slog.Warn("自动创建歌单失败", "include_subdirs", includeSubdirs, "error", err)
+	if _, err := s.playlistAutoCreator.AutoCreate(ctx, playlistMode, autoCreateExcludeDirs); err != nil {
+		slog.Warn("自动创建歌单失败", "playlist_mode", playlistMode, "error", err)
 	}
 }
 

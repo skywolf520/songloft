@@ -151,7 +151,7 @@ func (s *Song) CoverURLPath() string {
 	if s.CoverPath == "" && s.CoverURL == "" {
 		return ""
 	}
-	return fmt.Sprintf("/api/v1/songs/%d/cover", s.ID)
+	return fmt.Sprintf("/api/v1/songs/%d/cover?v=%d", s.ID, s.UpdatedAt.Unix())
 }
 
 // LyricURLPath 返回客户端用的统一歌词 URL。

@@ -189,18 +189,13 @@ func (a *App) Init() error {
 	}
 	if err := a.configService.GetJSON("cover_storage_path", &coverStorageConfig); err != nil {
 		slog.Warn("读取封面存储路径配置失败，使用默认值", "error", err)
-		coverStorageConfig.Path = "data/covers"
+		coverStorageConfig.Path = "covers"
 	}
 
 	// 确保封面存储目录存在
 	coverStoragePath := coverStorageConfig.Path
 	if !filepath.IsAbs(coverStoragePath) {
-		// 如果是相对路径，转换为绝对路径（相对于工作目录）
-		absPath, err := filepath.Abs(coverStoragePath)
-		if err != nil {
-			return fmt.Errorf("获取封面存储目录绝对路径失败：%w", err)
-		}
-		coverStoragePath = absPath
+		coverStoragePath = filepath.Join(filepath.Dir(a.config.DBPath), coverStoragePath)
 	}
 	if err := os.MkdirAll(coverStoragePath, 0755); err != nil {
 		return fmt.Errorf("创建封面存储目录失败：%w", err)

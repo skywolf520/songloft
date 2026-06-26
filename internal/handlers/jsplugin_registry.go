@@ -7,6 +7,7 @@ import (
 	"io"
 	"log/slog"
 	"net/http"
+	"net/url"
 	"strings"
 	"time"
 
@@ -253,19 +254,36 @@ func (h *JSPluginHandler) handleRegistryInstall(w http.ResponseWriter, r *http.R
 		return
 	}
 
-	downloadURL := req.DownloadURL
-	if req.GithubProxy != "" {
-		proxyPrefix := req.GithubProxy
-		if proxyPrefix[len(proxyPrefix)-1] != '/' {
-			proxyPrefix += "/"
+	var zipData []byte
+
+	// GitHub browser-style release URLs don't accept Bearer tokens for private
+	// repos. When a token is provided and the URL matches, use the GitHub API.
+	if req.Token != "" {
+		if owner, repo, tag, filename, ok := parseGitHubReleaseURL(req.DownloadURL); ok {
+			data, err := downloadGitHubReleaseAsset(r.Context(), owner, repo, tag, filename, req.Token)
+			if err != nil {
+				respondError(w, http.StatusInternalServerError, "下载插件失败", err)
+				return
+			}
+			zipData = data
 		}
-		downloadURL = proxyPrefix + downloadURL
 	}
 
-	zipData, err := downloadZIP(r.Context(), downloadURL, req.Token)
-	if err != nil {
-		respondError(w, http.StatusInternalServerError, "下载插件失败", err)
-		return
+	if zipData == nil {
+		downloadURL := req.DownloadURL
+		if req.GithubProxy != "" {
+			proxyPrefix := req.GithubProxy
+			if proxyPrefix[len(proxyPrefix)-1] != '/' {
+				proxyPrefix += "/"
+			}
+			downloadURL = proxyPrefix + downloadURL
+		}
+		data, err := downloadZIP(r.Context(), downloadURL, req.Token)
+		if err != nil {
+			respondError(w, http.StatusInternalServerError, "下载插件失败", err)
+			return
+		}
+		zipData = data
 	}
 
 	plugin, wasUpdate, err := h.packageMgr.InstallFromUpload(zipData)
@@ -344,6 +362,95 @@ func downloadZIP(ctx context.Context, url string, token string) ([]byte, error) 
 
 	const maxZIPSize = 50 << 20 // 50 MB
 	data, err := io.ReadAll(io.LimitReader(resp.Body, maxZIPSize+1))
+	if err != nil {
+		return nil, fmt.Errorf("read body: %w", err)
+	}
+	if len(data) > maxZIPSize {
+		return nil, fmt.Errorf("zip file exceeds %d bytes", maxZIPSize)
+	}
+	return data, nil
+}
+
+// parseGitHubReleaseURL extracts owner, repo, tag, and filename from a GitHub
+// browser-style release download URL. Returns ok=false for non-matching URLs.
+func parseGitHubReleaseURL(rawURL string) (owner, repo, tag, filename string, ok bool) {
+	u, err := url.Parse(rawURL)
+	if err != nil || u.Host != "github.com" {
+		return
+	}
+	// /owner/repo/releases/download/tag/filename
+	parts := strings.Split(strings.TrimPrefix(u.Path, "/"), "/")
+	if len(parts) == 6 && parts[2] == "releases" && parts[3] == "download" {
+		return parts[0], parts[1], parts[4], parts[5], true
+	}
+	return
+}
+
+// downloadGitHubReleaseAsset downloads a release asset from a private GitHub
+// repo via the GitHub API. Browser-style release URLs (github.com/.../releases/
+// download/...) don't accept Bearer tokens for private repos—only the API does.
+func downloadGitHubReleaseAsset(ctx context.Context, owner, repo, tag, filename, token string) ([]byte, error) {
+	client := httputil.NewClient(60 * time.Second)
+
+	releaseURL := fmt.Sprintf("https://api.github.com/repos/%s/%s/releases/tags/%s", owner, repo, tag)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, releaseURL, nil)
+	if err != nil {
+		return nil, fmt.Errorf("create release request: %w", err)
+	}
+	req.Header.Set("Authorization", "Bearer "+token)
+	req.Header.Set("Accept", "application/vnd.github+json")
+
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("get release by tag: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("get release %s/%s@%s: http status %d", owner, repo, tag, resp.StatusCode)
+	}
+
+	var release struct {
+		Assets []struct {
+			ID   int64  `json:"id"`
+			Name string `json:"name"`
+		} `json:"assets"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&release); err != nil {
+		return nil, fmt.Errorf("parse release: %w", err)
+	}
+
+	var assetID int64
+	for _, a := range release.Assets {
+		if a.Name == filename {
+			assetID = a.ID
+			break
+		}
+	}
+	if assetID == 0 {
+		return nil, fmt.Errorf("asset %q not found in release %s/%s@%s", filename, owner, repo, tag)
+	}
+
+	assetURL := fmt.Sprintf("https://api.github.com/repos/%s/%s/releases/assets/%d", owner, repo, assetID)
+	req2, err := http.NewRequestWithContext(ctx, http.MethodGet, assetURL, nil)
+	if err != nil {
+		return nil, fmt.Errorf("create asset request: %w", err)
+	}
+	req2.Header.Set("Authorization", "Bearer "+token)
+	req2.Header.Set("Accept", "application/octet-stream")
+
+	resp2, err := client.Do(req2)
+	if err != nil {
+		return nil, fmt.Errorf("download asset: %w", err)
+	}
+	defer resp2.Body.Close()
+
+	if resp2.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("download asset %s/%s@%s/%s: http status %d", owner, repo, tag, filename, resp2.StatusCode)
+	}
+
+	const maxZIPSize = 50 << 20
+	data, err := io.ReadAll(io.LimitReader(resp2.Body, maxZIPSize+1))
 	if err != nil {
 		return nil, fmt.Errorf("read body: %w", err)
 	}

@@ -335,6 +335,9 @@ func (m *Manager) EnablePlugin(ctx context.Context, id int64) error {
 		return fmt.Errorf("get plugin by id %d: %w", id, err)
 	}
 
+	// 先卸载可能残留的旧环境（如从 error 状态重新启用时）
+	_ = m.UnloadPlugin(ctx, plugin.EntryPath)
+
 	// 更新数据库状态
 	if err := m.repo.UpdateStatus(ctx, id, JSPluginStatusActive); err != nil {
 		return fmt.Errorf("update plugin status: %w", err)

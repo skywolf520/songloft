@@ -36,8 +36,8 @@ func NewScanner(config *ScanConfig) *Scanner {
 	}
 }
 
-// ScanFiles 扫描音乐文件
-func (s *Scanner) ScanFiles(ctx context.Context) ([]string, error) {
+// ScanFiles 扫描音乐文件。onProgress 为可选回调，每发现一批音频文件时调用，参数为当前已发现的文件总数。
+func (s *Scanner) ScanFiles(ctx context.Context, onProgress func(count int)) ([]string, error) {
 	// 检查目录是否存在
 	if _, err := os.Stat(s.config.MusicPath); os.IsNotExist(err) {
 		return nil, fmt.Errorf("music directory does not exist: %s", s.config.MusicPath)
@@ -48,7 +48,7 @@ func (s *Scanner) ScanFiles(ctx context.Context) ([]string, error) {
 	visited := make(map[string]bool)
 
 	// 递归扫描目录
-	err := s.scanDir(ctx, s.config.MusicPath, visited, &files)
+	err := s.scanDir(ctx, s.config.MusicPath, visited, &files, onProgress)
 	if err != nil {
 		return nil, fmt.Errorf("failed to scan directory: %w", err)
 	}
@@ -56,8 +56,10 @@ func (s *Scanner) ScanFiles(ctx context.Context) ([]string, error) {
 	return files, nil
 }
 
+const scanProgressInterval = 100
+
 // scanDir 递归扫描目录，支持软链接并防止循环
-func (s *Scanner) scanDir(ctx context.Context, dirPath string, visited map[string]bool, files *[]string) error {
+func (s *Scanner) scanDir(ctx context.Context, dirPath string, visited map[string]bool, files *[]string, onProgress func(count int)) error {
 	// 检查上下文是否已取消
 	select {
 	case <-ctx.Done():
@@ -108,13 +110,16 @@ func (s *Scanner) scanDir(ctx context.Context, dirPath string, visited map[strin
 
 		if info.IsDir() {
 			// 递归扫描子目录（包括软链接目录）
-			if err := s.scanDir(ctx, entryPath, visited, files); err != nil {
+			if err := s.scanDir(ctx, entryPath, visited, files, onProgress); err != nil {
 				return err
 			}
 		} else {
 			// 如果是音频文件，添加到列表
 			if s.IsAudioFile(entryPath) {
 				*files = append(*files, entryPath)
+				if onProgress != nil && len(*files)%scanProgressInterval == 0 {
+					onProgress(len(*files))
+				}
 			}
 		}
 	}

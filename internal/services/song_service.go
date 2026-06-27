@@ -331,7 +331,9 @@ const (
 func (s *SongService) doScanAndImport(ctx context.Context, reimport bool) {
 	cancelCh := s.scanProgressManager.GetCancelChannel()
 
-	files, err := s.scanner.ScanFiles(ctx)
+	files, err := s.scanner.ScanFiles(ctx, func(count int) {
+		s.scanProgressManager.SetDiscoveredFiles(count)
+	})
 	if err != nil {
 		s.scanProgressManager.Fail(fmt.Errorf("failed to scan files: %w", err))
 		return

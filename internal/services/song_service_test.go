@@ -110,7 +110,7 @@ type mockTestScanner struct {
 	scanErr error
 }
 
-func (m *mockTestScanner) ScanFiles(ctx context.Context) ([]string, error) {
+func (m *mockTestScanner) ScanFiles(ctx context.Context, _ func(count int)) ([]string, error) {
 	if m.scanErr != nil {
 		return nil, m.scanErr
 	}

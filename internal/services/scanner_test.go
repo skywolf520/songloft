@@ -71,7 +71,7 @@ func TestScanFiles(t *testing.T) {
 	scanner := NewScanner(config)
 	ctx := context.Background()
 
-	files, err := scanner.ScanFiles(ctx)
+	files, err := scanner.ScanFiles(ctx, nil)
 	if err != nil {
 		t.Fatalf("ScanFiles() error = %v", err)
 	}
@@ -180,7 +180,7 @@ func TestScanWithEmptyDir(t *testing.T) {
 	scanner := NewScanner(config)
 	ctx := context.Background()
 
-	files, err := scanner.ScanFiles(ctx)
+	files, err := scanner.ScanFiles(ctx, nil)
 	if err != nil {
 		t.Fatalf("ScanFiles() error = %v", err)
 	}
@@ -201,7 +201,7 @@ func TestScanWithNonExistentDir(t *testing.T) {
 	scanner := NewScanner(config)
 	ctx := context.Background()
 
-	_, err := scanner.ScanFiles(ctx)
+	_, err := scanner.ScanFiles(ctx, nil)
 	if err == nil {
 		t.Error("ScanFiles() with non-existent dir should return error")
 	}
@@ -282,7 +282,7 @@ func TestScanWithNestedDirs(t *testing.T) {
 	scanner := NewScanner(config)
 	ctx := context.Background()
 
-	foundFiles, err := scanner.ScanFiles(ctx)
+	foundFiles, err := scanner.ScanFiles(ctx, nil)
 	if err != nil {
 		t.Fatalf("ScanFiles() error = %v", err)
 	}
@@ -315,7 +315,7 @@ func TestScanWithSymlinks(t *testing.T) {
 	scanner := NewScanner(config)
 	ctx := context.Background()
 
-	files, err := scanner.ScanFiles(ctx)
+	files, err := scanner.ScanFiles(ctx, nil)
 	if err != nil {
 		t.Fatalf("ScanFiles() error = %v", err)
 	}
@@ -351,7 +351,7 @@ func TestScanWithMixedFormats(t *testing.T) {
 	scanner := NewScanner(config)
 	ctx := context.Background()
 
-	files, err := scanner.ScanFiles(ctx)
+	files, err := scanner.ScanFiles(ctx, nil)
 	if err != nil {
 		t.Fatalf("ScanFiles() error = %v", err)
 	}

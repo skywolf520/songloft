@@ -65,11 +65,11 @@ func (s *Scanner) scanDir(ctx context.Context, dirPath string, visited map[strin
 	default:
 	}
 
-	// 获取目录的真实路径（解析软链接）
+	// 获取目录的真实路径（解析软链接）用于循环检测
 	realPath, err := filepath.EvalSymlinks(dirPath)
 	if err != nil {
-		// 如果无法解析软链接（如目标不存在），跳过
-		return nil
+		// EvalSymlinks 在某些平台（如 Android FUSE）可能失败，退回原始路径
+		realPath = dirPath
 	}
 
 	// 检查是否已访问过该真实路径，防止循环
@@ -274,7 +274,7 @@ func (s *Scanner) collectDirNames(ctx context.Context, dirPath string, visited m
 	// 解析软链接，防止循环
 	realPath, err := filepath.EvalSymlinks(dirPath)
 	if err != nil {
-		return nil
+		realPath = dirPath
 	}
 	if visited[realPath] {
 		return nil

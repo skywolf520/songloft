@@ -156,8 +156,12 @@ func (a *App) Init() error {
 		musicPathConfig.ExcludePaths = []string{}
 	}
 	// 移动端传入的音乐目录优先级最高（每次启动时由客户端指定）
-	if a.config.MusicDir != "" {
+	// 同步写回 DB，确保 GET /settings/music-path 和 onMusicPathConfigChanged 读到正确值
+	if a.config.MusicDir != "" && musicPathConfig.Path != a.config.MusicDir {
 		musicPathConfig.Path = a.config.MusicDir
+		if err := a.configService.SetJSON("music_path", musicPathConfig); err != nil {
+			slog.Warn("同步移动端音乐目录到配置失败", "error", err)
+		}
 	}
 
 	// 从数据库读取扫描配置
